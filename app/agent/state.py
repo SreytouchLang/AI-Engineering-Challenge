@@ -12,6 +12,11 @@ class LatencySnapshot(BaseModel):
     speech_recognized_ms: float | None = None
     model_response_generated_ms: float | None = None
     speech_playback_started_ms: float | None = None
+    stt_latency_ms: float | None = None
+    llm_latency_ms: float | None = None
+    tts_latency_ms: float | None = None
+    total_response_latency_ms: float | None = None
+    silence_before_turn_ms: float | None = None
 
 
 class ConversationTurn(BaseModel):

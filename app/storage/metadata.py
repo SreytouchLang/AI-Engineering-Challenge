@@ -10,6 +10,11 @@ class CallMetadata(BaseModel):
 
     call_id: str
     provider_call_id: str | None = None
+    provider_recording_id: str | None = None
+    provider_recording_status: str | None = None
+    provider_recording_channels: str | None = None
+    provider_recording_source: str | None = None
+    provider_recording_url: str | None = None
     scenario_id: str
     destination_number: str
     originating_number_masked: str | None = None
@@ -35,3 +40,4 @@ class CallMetadata(BaseModel):
     analysis_completion_status: str = "pending"
     submission_ready: bool = False
     reviewer_notes: str | None = None
+    problems: list[str] = Field(default_factory=list)

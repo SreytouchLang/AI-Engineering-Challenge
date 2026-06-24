@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import statistics
 import wave
+from datetime import date
 from pathlib import Path
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -15,11 +16,60 @@ from app.storage.metadata import CallMetadata
 class HumanVoiceReview(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
+    reviewer: str | None = None
+    review_date: date | None = None
     naturalness: int | None = Field(default=None, ge=1, le=5)
     clarity: int | None = Field(default=None, ge=1, le=5)
     pacing: int | None = Field(default=None, ge=1, le=5)
     persona_consistency: int | None = Field(default=None, ge=1, le=5)
+    turn_taking: int | None = Field(default=None, ge=1, le=5)
+    scenario_completion: int | None = Field(default=None, ge=1, le=5)
+    audio_quality: int | None = Field(default=None, ge=1, le=5)
+    transcript_quality: int | None = Field(default=None, ge=1, le=5)
+    bug_evidence: int | None = Field(default=None, ge=1, le=5)
+    played_from_beginning_to_end: bool | None = None
+    both_speakers_audible: bool | None = None
+    conversation_coherent: bool | None = None
+    patient_sounds_natural: bool | None = None
+    turn_taking_sensible: bool | None = None
+    no_major_audio_glitches: bool | None = None
+    no_excessive_delay: bool | None = None
+    scenario_objective_pursued: bool | None = None
+    final_outcome_clear: bool | None = None
+    approved_for_submission: bool | None = None
     reviewer_notes: str | None = None
+
+    def is_completed(self) -> bool:
+        checklist_values = (
+            self.played_from_beginning_to_end,
+            self.both_speakers_audible,
+            self.conversation_coherent,
+            self.patient_sounds_natural,
+            self.turn_taking_sensible,
+            self.no_major_audio_glitches,
+            self.no_excessive_delay,
+            self.scenario_objective_pursued,
+            self.final_outcome_clear,
+            self.approved_for_submission,
+        )
+        score_values = (
+            self.naturalness,
+            self.clarity,
+            self.pacing,
+            self.persona_consistency,
+            self.turn_taking,
+            self.scenario_completion,
+            self.audio_quality,
+            self.transcript_quality,
+            self.bug_evidence,
+        )
+        return (
+            self.reviewer is not None
+            and self.review_date is not None
+            and self.reviewer_notes is not None
+            and all(value is not None for value in checklist_values)
+            and all(value is not None for value in score_values)
+        )
 
 
 class VoiceQualityReport(BaseModel):

@@ -5,6 +5,7 @@ from typing import Callable
 
 from app.analysis.schemas import CallEvaluation, EvaluationIssue, Severity
 from app.storage.metadata import CallMetadata
+from app.submission import is_provider_confirmed_live_call
 
 
 def review_issues(
@@ -44,7 +45,9 @@ def build_bug_report(
     included_calls: set[str] = set()
     for evaluation in evaluations:
         metadata = metadata_by_call.get(evaluation.call_id)
-        if metadata is not None and metadata.transcript_validation_status != "passed":
+        if metadata is None or not is_provider_confirmed_live_call(metadata):
+            continue
+        if metadata.transcript_validation_status != "passed":
             continue
         included_calls.add(evaluation.call_id)
         for issue in evaluation.issues:
@@ -129,6 +132,58 @@ def build_bug_report(
     report = "\n".join(lines).rstrip() + "\n"
     output_path.write_text(report, encoding="utf-8")
     return report
+
+
+def build_bug_review_queue(
+    evaluations: list[CallEvaluation],
+    metadata_by_call: dict[str, CallMetadata],
+    output_path: Path,
+) -> str:
+    lines = ["# Bug Review Queue", ""]
+    candidate_count = 0
+    for evaluation in evaluations:
+        metadata = metadata_by_call.get(evaluation.call_id)
+        if metadata is None or not is_provider_confirmed_live_call(metadata):
+            continue
+        if metadata.transcript_validation_status != "passed":
+            continue
+        for issue in evaluation.issues:
+            if not _issue_is_reportable(issue):
+                continue
+            candidate_count += 1
+            lines.extend(
+                [
+                    f"## Candidate BUG-{candidate_count:03d}",
+                    "",
+                    f"**Call:** {evaluation.call_id}  ",
+                    f"**Scenario:** {evaluation.scenario_id}  ",
+                    f"**Timestamp:** {issue.timestamp}  ",
+                    f"**Severity proposed:** {issue.severity.value.title()}  ",
+                    f"**Category:** {issue.category}  ",
+                    f"**Recording:** {issue.recording_path or metadata.mixed_recording_path or metadata.recording_path or ''}  ",
+                    f"**Transcript:** {issue.transcript_path or metadata.transcript_path or ''}  ",
+                    "",
+                    f"**Evidence:** {issue.evidence_excerpt or issue.evidence}",
+                    "",
+                    "- [ ] Approve",
+                    "- [ ] Reject",
+                    "- [ ] Edit severity",
+                    "- [ ] Merge with another issue",
+                    "",
+                    "Reviewer notes:",
+                    "",
+                ]
+            )
+    if candidate_count == 0:
+        lines.extend(
+            [
+                "No validated live-call bug candidates are available yet.",
+                "",
+            ]
+        )
+    content = "\n".join(lines).rstrip() + "\n"
+    output_path.write_text(content, encoding="utf-8")
+    return content
 
 
 def _edit_issue(issue: EvaluationIssue, input_fn: Callable[[str], str]) -> None:

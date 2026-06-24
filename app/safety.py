@@ -10,7 +10,9 @@ E164_PATTERN = re.compile(r"^\+[1-9]\d{9,14}$")
 SECRET_PATTERNS = (
     re.compile(r"sk-[A-Za-z0-9]{20,}"),
     re.compile(r"AC[a-fA-F0-9]{32}"),
-    re.compile(r"(?i)(api[_-]?key|auth[_-]?token)\s*[:=]\s*['\"]?[A-Za-z0-9_\-]{12,}"),
+    re.compile(
+        r"(?im)(?:api[_-]?key|auth[_-]?token)[ \t]*[:=][ \t]*['\"]?([A-Za-z0-9_\-]{12,})['\"]?"
+    ),
 )
 
 
@@ -74,7 +76,11 @@ def scan_paths_for_secrets(paths: list[Path]) -> dict[Path, list[str]]:
     for path in paths:
         if path.is_dir():
             continue
-        findings = find_secret_like_values(path.read_text(encoding="utf-8"))
+        try:
+            content = path.read_text(encoding="utf-8")
+        except UnicodeDecodeError:
+            continue
+        findings = find_secret_like_values(content)
         if findings:
             results[path] = findings
     return results
@@ -98,4 +104,3 @@ class RunBudget:
             )
         self.calls_started += 1
         self.projected_cost_usd += estimated_cost_usd
-

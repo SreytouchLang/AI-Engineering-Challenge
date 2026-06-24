@@ -8,7 +8,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-from app.analysis.bug_reporter import build_bug_report, review_issues
+from app.analysis.bug_reporter import build_bug_report, build_bug_review_queue, review_issues
 from app.config import get_settings
 from app.storage.artifacts import ArtifactStore
 from app.storage.metadata import CallMetadata
@@ -38,12 +38,18 @@ def main() -> None:
         for evaluation in evaluations:
             artifact_store.write_evaluation(evaluation)
 
+    queue = build_bug_review_queue(
+        evaluations,
+        metadata_by_call,
+        settings.project_root / "BUG_REVIEW_QUEUE.md",
+    )
     report = build_bug_report(
         evaluations,
         metadata_by_call,
         settings.project_root / "BUG_REPORT.md",
         include_pending=not args.review,
     )
+    print(queue)
     print(report)
 
 

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+import time
 
 from openai import OpenAI
 
@@ -16,6 +17,7 @@ class PatientReply:
     action: str
     reason: str
     scenario_goal_progress: float
+    llm_latency_ms: float | None = None
     should_end_call: bool = False
     disclosed_facts: dict[str, str] = field(default_factory=dict)
     correction: str | None = None
@@ -91,30 +93,33 @@ class PatientAgent:
         if plan.should_end_call:
             self.state.mark_complete("goal_reached")
 
-        text = self._render_utterance(plan)
+        text, llm_latency_ms = self._render_utterance(plan)
         return PatientReply(
             text=text,
             action=plan.action.value,
             reason=plan.reason,
             scenario_goal_progress=plan.scenario_goal_progress,
+            llm_latency_ms=llm_latency_ms,
             should_end_call=plan.should_end_call,
             disclosed_facts=plan.disclosed_facts,
             correction=plan.correction,
             allow_overlap=plan.allow_overlap,
         )
 
-    def _render_utterance(self, plan: PatientActionPlan) -> str:
+    def _render_utterance(self, plan: PatientActionPlan) -> tuple[str, float | None]:
         text = self._apply_response_style(plan.utterance)
         if self.llm_client is None:
-            return text
+            return text, None
         instructions = build_patient_instructions(self.scenario, self.state)
+        started = time.perf_counter()
         refined = self.llm_client.refine_response(
             instructions=instructions,
             draft_utterance=text,
             action=plan.action.value,
             reason=plan.reason,
         )
-        return self._apply_response_style(refined)
+        latency_ms = (time.perf_counter() - started) * 1000
+        return self._apply_response_style(refined), latency_ms
 
     def _apply_response_style(self, text: str) -> str:
         cleaned = " ".join(text.split())

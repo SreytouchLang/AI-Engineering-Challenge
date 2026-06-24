@@ -1,5 +1,7 @@
 # Pretty Good AI Voice Tester
 
+Repository: https://github.com/SreytouchLang/AI-Engineering-Challenge
+
 This repository implements a Python voice-bot assessment harness for Pretty Good AI's authorized challenge number, `+1-805-439-8008`. The current build is intentionally split into two layers:
 
 1. A fully runnable local dry-run path that validates scenarios, simulates natural patient conversations, writes transcripts and metadata, and generates structured evaluations and bug reports.
@@ -89,13 +91,13 @@ This writes a transcript and metadata under `artifacts/` without dialing a phone
 
 ## One-Call Instructions
 
-Preview the live call configuration first:
+Run the explicit live-call preflight first:
 
 ```bash
-ENABLE_REAL_CALLS=true python scripts/run_call.py --scenario scenarios/01_simple_scheduling.yaml
+python scripts/preflight_live_call.py --scenario scenarios/01_simple_scheduling.yaml
 ```
 
-Actually place the call only after reviewing the preview:
+If the preflight is ready and you explicitly want to dial, place one call at a time with the live gate enabled:
 
 ```bash
 ENABLE_REAL_CALLS=true python scripts/run_call.py \
@@ -108,6 +110,8 @@ Or with `make`:
 ```bash
 make call SCENARIO=scenarios/01_simple_scheduling.yaml CONFIRM_REAL_CALL=true
 ```
+
+The live path now prints a preflight summary and still requires a final interactive confirmation before dialing.
 
 ## Scenario-Suite Instructions
 
@@ -162,6 +166,46 @@ Open the local review dashboard after `make serve`:
 http://localhost:8000/review/
 ```
 
+## Submission Prep Commands
+
+Validate scenario completeness:
+
+```bash
+python scripts/validate_scenarios.py
+```
+
+Summarize current live-call evidence and generate the review templates:
+
+```bash
+python scripts/summarize_live_calls.py
+```
+
+Validate committed live-call recordings:
+
+```bash
+python scripts/validate_recordings.py
+```
+
+Validate committed live-call transcripts:
+
+```bash
+python scripts/validate_transcripts.py
+```
+
+Rank currently selected calls:
+
+```bash
+python scripts/rank_calls.py
+```
+
+Run the final repository readiness check:
+
+```bash
+make submission-check
+```
+
+`make submission-check` is intentionally strict and exits nonzero until public Loom links, approved live-call evidence, and submission-ready call selections exist.
+
 ## Cost Controls
 
 - The destination number is locked to `+18054398008`
@@ -201,7 +245,7 @@ http://localhost:8000/review/
 
 ## Final Submission Checklist
 
-- [ ] Public GitHub repository is accessible
+- [x] Public GitHub repository is accessible
 - [x] Python code runs locally in dry-run mode
 - [x] README contains setup and run instructions
 - [x] `.env.example` exists

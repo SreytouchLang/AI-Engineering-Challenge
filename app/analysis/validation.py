@@ -6,6 +6,7 @@ from pathlib import Path
 from pydantic import BaseModel, ConfigDict, Field
 
 from app.analysis.transcript import TranscriptDocument
+from app.safety import find_secret_like_values
 from app.storage.artifacts import ArtifactPaths
 from app.storage.metadata import CallMetadata
 from app.voice.audio import wav_duration_seconds
@@ -96,6 +97,9 @@ class TranscriptValidator:
         channel_consistency = self._channel_consistency(segments)
         overlap_preserved = self._overlap_preserved(segments)
         corrections_reflected = self._corrections_reflected(segments)
+        starts_near_call_start = bool(segments) and segments[0].start_timestamp <= 5.0
+        no_placeholder_text = self._no_placeholder_text(segments)
+        no_secret_like_content = self._no_secret_like_content(segments)
 
         if not both_speakers_present:
             issues.append(
@@ -167,6 +171,30 @@ class TranscriptValidator:
                     message="A corrected fact appears to be contradicted later in the transcript.",
                 )
             )
+        if not starts_near_call_start:
+            issues.append(
+                TranscriptValidationIssue(
+                    code="late_transcript_start",
+                    severity="medium",
+                    message="Transcript does not begin near the start of the call.",
+                )
+            )
+        if not no_placeholder_text:
+            issues.append(
+                TranscriptValidationIssue(
+                    code="placeholder_text_detected",
+                    severity="high",
+                    message="Transcript contains placeholder or undecoded text.",
+                )
+            )
+        if not no_secret_like_content:
+            issues.append(
+                TranscriptValidationIssue(
+                    code="secret_like_content_detected",
+                    severity="high",
+                    message="Transcript contains content that resembles a credential or token.",
+                )
+            )
 
         checks = {
             "both_speakers_present": both_speakers_present,
@@ -177,6 +205,9 @@ class TranscriptValidator:
             "overlap_preserved": overlap_preserved,
             "corrections_reflected": corrections_reflected,
             "confidence_threshold_met": average_confidence >= self.confidence_threshold,
+            "starts_near_call_start": starts_near_call_start,
+            "no_placeholder_text": no_placeholder_text,
+            "no_secret_like_content": no_secret_like_content,
         }
         metrics = {
             "transcript_duration_seconds": round(transcript.duration_seconds, 2),
@@ -278,3 +309,15 @@ class TranscriptValidator:
                 if any(token in lowered for token in known_wrong_tokens):
                     return False
         return True
+
+    def _no_placeholder_text(self, segments) -> bool:
+        placeholders = ("tbd", "placeholder", "[inaudible]", "lorem ipsum")
+        for segment in segments:
+            lowered = segment.text.lower()
+            if any(token in lowered for token in placeholders):
+                return False
+        return True
+
+    def _no_secret_like_content(self, segments) -> bool:
+        combined = "\n".join(segment.text for segment in segments)
+        return not find_secret_like_values(combined)

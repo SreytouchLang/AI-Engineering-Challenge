@@ -56,9 +56,13 @@ class TwilioTelephonyClient:
                 recording_channels="dual",
                 recording_track="both",
                 time_limit=self.settings.max_call_duration_seconds,
-                status_callback=f"{base_url}{self.settings.twilio_status_callback_path}",
+                status_callback=(
+                    f"{base_url}{self.settings.twilio_status_callback_path}"
+                    f"?call_id={escape(call_id)}"
+                ),
                 recording_status_callback=(
                     f"{base_url}{self.settings.twilio_recording_callback_path}"
+                    f"?call_id={escape(call_id)}"
                 ),
             )
         except TwilioException as exc:

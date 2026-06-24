@@ -6,6 +6,7 @@
 
 - Explain that the system calls only the authorized assessment line as a fictional patient.
 - State that the repo already supports dry-run simulation, transcript generation, structured evaluation, and a guarded live-call path.
+- If real calls exist by recording time, name the strongest selected call immediately and say why it was chosen.
 
 ### 0:30–1:20 — Architecture
 
@@ -15,7 +16,8 @@
 
 ### 1:20–2:20 — Conversation quality
 
-- Run a dry-run scenario from `make dry-run`.
+- Prefer the strongest real selected call here once it exists.
+- If real calls are still pending, say that explicitly and use a dry-run clip only as an implementation preview rather than submission evidence.
 - Open the resulting transcript and point out short patient responses, corrections, and scenario-driven behavior.
 
 ### 2:20–3:20 — Bugs found
@@ -32,12 +34,12 @@
 ### 4:10–5:00 — Code quality and run command
 
 - Show the number guard in `app/safety.py`.
-- Show the live-call preview gate in `scripts/run_call.py`.
-- End with current limitations: live credentials and manually verified recordings are still required.
+- Show the live-call preflight gate in `scripts/preflight_live_call.py` and the final interactive confirmation in `scripts/run_call.py`.
+- End with current limitations: live credentials, manually verified recordings, and Loom URLs are still required until they are actually produced.
 
 ## AI Debugging Recording
 
-Use a real issue from this repo: the dry-run context-change scenario initially skipped the updated confirmation branch after the patient changed the visit reason.
+Prefer a real approved live-call bug here once one exists. Until then, use the already-fixed context-change regression only as a rehearsal script and say clearly that it is not a live-call submission finding.
 
 ### Reproduction
 
@@ -72,4 +74,3 @@ pytest tests/test_dry_run.py -k context_change
 ### Prompt 4 — Verify
 
 “The focused tests now pass. Review whether they genuinely prove that the updated appointment day and visit reason are retained, rather than only checking a mocked implementation detail.”
-

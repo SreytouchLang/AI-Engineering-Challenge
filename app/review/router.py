@@ -102,14 +102,14 @@ async def review_call(call_id: str) -> str:
     transcript_rows = []
     for index, segment in enumerate(bundle.transcript.segments):
         transcript_rows.append(
-            "<tr id='seg-{idx}'>"
+            "<tr id='seg-{idx}' onclick='jumpTo({start})' style='cursor:pointer;'>"
             f"<td>{index}</td>"
             f"<td>{escape(segment.speaker)}</td>"
             f"<td>{segment.start_timestamp:.2f}</td>"
             f"<td>{segment.end_timestamp:.2f}</td>"
             f"<td>{escape(segment.action or '')}</td>"
             f"<td>{escape(segment.text)}</td>"
-            "</tr>".format(idx=index)
+            "</tr>".format(idx=index, start=segment.start_timestamp)
         )
 
     issue_cards = []
@@ -154,10 +154,27 @@ async def review_call(call_id: str) -> str:
         <h2>Voice Quality</h2>
         <p><strong>Overall score:</strong> {bundle.quality.overall_score}</p>
         <form method="post" action="/review/calls/{call_id}/quality">
+          <label>Reviewer <input name="reviewer" value="{escape(review.reviewer or '')}" /></label>
+          <label>Review date <input name="review_date" type="date" value="{review.review_date or ''}" /></label>
           <label>Naturalness <input name="naturalness" type="number" min="1" max="5" value="{review.naturalness or ''}" /></label>
           <label>Clarity <input name="clarity" type="number" min="1" max="5" value="{review.clarity or ''}" /></label>
           <label>Pacing <input name="pacing" type="number" min="1" max="5" value="{review.pacing or ''}" /></label>
           <label>Persona consistency <input name="persona_consistency" type="number" min="1" max="5" value="{review.persona_consistency or ''}" /></label>
+          <label>Turn-taking <input name="turn_taking" type="number" min="1" max="5" value="{review.turn_taking or ''}" /></label>
+          <label>Scenario completion <input name="scenario_completion" type="number" min="1" max="5" value="{review.scenario_completion or ''}" /></label>
+          <label>Audio quality <input name="audio_quality" type="number" min="1" max="5" value="{review.audio_quality or ''}" /></label>
+          <label>Transcript quality <input name="transcript_quality" type="number" min="1" max="5" value="{review.transcript_quality or ''}" /></label>
+          <label>Bug evidence <input name="bug_evidence" type="number" min="1" max="5" value="{review.bug_evidence or ''}" /></label>
+          <label>Listened end to end <input name="played_from_beginning_to_end" type="checkbox" {_checked(review.played_from_beginning_to_end)} /></label>
+          <label>Both speakers audible <input name="both_speakers_audible" type="checkbox" {_checked(review.both_speakers_audible)} /></label>
+          <label>Conversation coherent <input name="conversation_coherent" type="checkbox" {_checked(review.conversation_coherent)} /></label>
+          <label>Patient sounds natural <input name="patient_sounds_natural" type="checkbox" {_checked(review.patient_sounds_natural)} /></label>
+          <label>Turn-taking sensible <input name="turn_taking_sensible" type="checkbox" {_checked(review.turn_taking_sensible)} /></label>
+          <label>No major audio glitches <input name="no_major_audio_glitches" type="checkbox" {_checked(review.no_major_audio_glitches)} /></label>
+          <label>No excessive delay <input name="no_excessive_delay" type="checkbox" {_checked(review.no_excessive_delay)} /></label>
+          <label>Scenario objective pursued <input name="scenario_objective_pursued" type="checkbox" {_checked(review.scenario_objective_pursued)} /></label>
+          <label>Final outcome clear <input name="final_outcome_clear" type="checkbox" {_checked(review.final_outcome_clear)} /></label>
+          <label>Approved for submission <input name="approved_for_submission" type="checkbox" {_checked(review.approved_for_submission)} /></label>
           <label>Reviewer notes <input name="reviewer_notes" size="70" value="{escape(review.reviewer_notes or '')}" /></label>
           <button type="submit">Save Quality Review</button>
         </form>
@@ -252,19 +269,73 @@ async def update_issue(
 @router.post("/calls/{call_id}/quality")
 async def update_quality_review(
     call_id: str,
+    reviewer: str = Form(""),
+    review_date: str = Form(""),
     naturalness: str = Form(""),
     clarity: str = Form(""),
     pacing: str = Form(""),
     persona_consistency: str = Form(""),
+    turn_taking: str = Form(""),
+    scenario_completion: str = Form(""),
+    audio_quality: str = Form(""),
+    transcript_quality: str = Form(""),
+    bug_evidence: str = Form(""),
+    played_from_beginning_to_end: str | None = Form(None),
+    both_speakers_audible: str | None = Form(None),
+    conversation_coherent: str | None = Form(None),
+    patient_sounds_natural: str | None = Form(None),
+    turn_taking_sensible: str | None = Form(None),
+    no_major_audio_glitches: str | None = Form(None),
+    no_excessive_delay: str | None = Form(None),
+    scenario_objective_pursued: str | None = Form(None),
+    final_outcome_clear: str | None = Form(None),
+    approved_for_submission: str | None = Form(None),
     reviewer_notes: str = Form(""),
 ) -> RedirectResponse:
     bundle = _load_call_bundle(call_id)
     if bundle.quality is None:
         raise HTTPException(status_code=404, detail="No quality artifact found for this call.")
+    bundle.quality.human_review.reviewer = reviewer or None
+    bundle.quality.human_review.review_date = review_date or None
     bundle.quality.human_review.naturalness = _optional_int(naturalness)
     bundle.quality.human_review.clarity = _optional_int(clarity)
     bundle.quality.human_review.pacing = _optional_int(pacing)
     bundle.quality.human_review.persona_consistency = _optional_int(persona_consistency)
+    bundle.quality.human_review.turn_taking = _optional_int(turn_taking)
+    bundle.quality.human_review.scenario_completion = _optional_int(scenario_completion)
+    bundle.quality.human_review.audio_quality = _optional_int(audio_quality)
+    bundle.quality.human_review.transcript_quality = _optional_int(transcript_quality)
+    bundle.quality.human_review.bug_evidence = _optional_int(bug_evidence)
+    bundle.quality.human_review.played_from_beginning_to_end = _checkbox_to_bool(
+        played_from_beginning_to_end
+    )
+    bundle.quality.human_review.both_speakers_audible = _checkbox_to_bool(
+        both_speakers_audible
+    )
+    bundle.quality.human_review.conversation_coherent = _checkbox_to_bool(
+        conversation_coherent
+    )
+    bundle.quality.human_review.patient_sounds_natural = _checkbox_to_bool(
+        patient_sounds_natural
+    )
+    bundle.quality.human_review.turn_taking_sensible = _checkbox_to_bool(
+        turn_taking_sensible
+    )
+    bundle.quality.human_review.no_major_audio_glitches = _checkbox_to_bool(
+        no_major_audio_glitches
+    )
+    bundle.quality.human_review.no_excessive_delay = _checkbox_to_bool(
+        no_excessive_delay
+    )
+    bundle.quality.human_review.scenario_objective_pursued = _checkbox_to_bool(
+        scenario_objective_pursued
+    )
+    bundle.quality.human_review.final_outcome_clear = _checkbox_to_bool(
+        final_outcome_clear
+    )
+    bundle.quality.human_review.approved_for_submission = _checkbox_to_bool(
+        approved_for_submission
+    )
     bundle.quality.human_review.reviewer_notes = reviewer_notes or None
     artifact_store.write_model_json(bundle.paths.quality_json, bundle.quality)
     artifact_store.write_markdown(bundle.paths.quality_md, bundle.quality.render_markdown())
@@ -380,6 +451,14 @@ def _load_call_bundle(call_id: str) -> _CallBundle:
 def _optional_int(value: str) -> int | None:
     value = value.strip()
     return int(value) if value else None
+
+
+def _checkbox_to_bool(value: str | None) -> bool:
+    return value is not None
+
+
+def _checked(value: bool | None) -> str:
+    return "checked" if value else ""
 
 
 def _page(title: str, body: str) -> str:

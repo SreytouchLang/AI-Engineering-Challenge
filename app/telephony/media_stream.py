@@ -189,6 +189,17 @@ class MediaStreamSession:
         if not transcription.text:
             return
 
+        self._log_metric(
+            "stt_turn_completed",
+            {
+                "call_id": self.call_id,
+                "turn_count": self.state.turn_count,
+                "stt_latency_ms": round(transcription.latency_ms, 1),
+                "agent_turn_duration_ms": turn.duration_ms,
+                "average_rms": round(turn.average_rms, 1),
+            },
+        )
+
         self._append_segment(
             speaker="AGENT",
             text=transcription.text,
@@ -197,6 +208,7 @@ class MediaStreamSession:
             latency=LatencySnapshot(
                 audio_received_ms=0.0,
                 speech_recognized_ms=transcription.latency_ms,
+                stt_latency_ms=transcription.latency_ms,
             ),
             confidence=transcription.confidence or 0.78,
             channel="agent",
@@ -221,6 +233,7 @@ class MediaStreamSession:
             progress=reply.scenario_goal_progress,
             reason=reply.reason,
             allow_overlap=reply.allow_overlap,
+            llm_latency_ms=reply.llm_latency_ms,
         )
         if reply.should_end_call:
             self.state.mark_complete("goal_reached")
@@ -237,6 +250,7 @@ class MediaStreamSession:
         interrupted: bool = False,
         allow_overlap: bool = False,
         overlap_duration_ms: int = 0,
+        llm_latency_ms: float | None = None,
     ) -> None:
         synthesis = self.tts_client.synthesize(
             text,
@@ -254,6 +268,23 @@ class MediaStreamSession:
             TimedPcmSegment(start_ms=int(timestamp_start * 1000), pcm_bytes=patient_pcm)
         )
 
+        total_response_latency_ms = (llm_latency_ms or 0.0) + synthesis.latency_ms
+        self._log_metric(
+            "patient_response_queued",
+            {
+                "call_id": self.call_id,
+                "turn_count": self.state.turn_count,
+                "action": action,
+                "stt_latency_ms": None,
+                "llm_latency_ms": round(llm_latency_ms or 0.0, 1),
+                "tts_latency_ms": round(synthesis.latency_ms, 1),
+                "total_response_latency_ms": round(total_response_latency_ms, 1),
+                "overlap_duration_ms": overlap_duration_ms,
+                "successful_barge_ins": self.state.successful_barge_ins,
+                "accidental_interruptions": self.state.accidental_interruptions,
+            },
+        )
+
         segment_index = self._append_segment(
             speaker="PATIENT",
             text=text,
@@ -263,6 +294,9 @@ class MediaStreamSession:
             latency=LatencySnapshot(
                 model_response_generated_ms=synthesis.latency_ms,
                 speech_playback_started_ms=synthesis.latency_ms,
+                llm_latency_ms=llm_latency_ms,
+                tts_latency_ms=synthesis.latency_ms,
+                total_response_latency_ms=total_response_latency_ms,
             ),
             action=action,
             progress=progress,
@@ -437,12 +471,38 @@ class MediaStreamSession:
         self.artifact_store.convert_audio(mixed_wav_path, paths.mixed_recording)
         mixed_wav_path.unlink(missing_ok=True)
 
+        existing_metadata = None
+        if paths.metadata_json.exists():
+            existing_metadata = CallMetadata.model_validate_json(
+                paths.metadata_json.read_text(encoding="utf-8")
+            )
+
         metadata = CallMetadata(
             call_id=self.call_id,
+            provider_call_id=(
+                existing_metadata.provider_call_id if existing_metadata else None
+            ),
+            provider_recording_id=(
+                existing_metadata.provider_recording_id if existing_metadata else None
+            ),
+            provider_recording_status=(
+                existing_metadata.provider_recording_status if existing_metadata else None
+            ),
+            provider_recording_channels=(
+                existing_metadata.provider_recording_channels if existing_metadata else None
+            ),
+            provider_recording_source=(
+                existing_metadata.provider_recording_source if existing_metadata else None
+            ),
+            provider_recording_url=(
+                existing_metadata.provider_recording_url if existing_metadata else None
+            ),
             scenario_id=self.scenario.id,
             destination_number=self.settings.authorized_destination,
-            originating_number_masked=None,
-            start_time=self.started_at,
+            originating_number_masked=(
+                existing_metadata.originating_number_masked if existing_metadata else None
+            ),
+            start_time=existing_metadata.start_time if existing_metadata else self.started_at,
             end_time=datetime.now(UTC),
             duration_seconds=duration_seconds,
             call_status="completed",
@@ -462,6 +522,7 @@ class MediaStreamSession:
             average_transcript_confidence=self._average_confidence(),
             termination_reason=self.state.termination_reason,
             analysis_completion_status="pending",
+            problems=existing_metadata.problems if existing_metadata else [],
         )
         self.artifact_store.write_transcript(transcript)
         self.artifact_store.write_metadata(metadata)
@@ -488,3 +549,7 @@ class MediaStreamSession:
 
     def _playback_is_active(self) -> bool:
         return self.playback_task is not None and not self.playback_task.done()
+
+    def _log_metric(self, event: str, payload: dict[str, object]) -> None:
+        log_payload = {"event": event, **payload}
+        print(json.dumps(log_payload, sort_keys=True))
