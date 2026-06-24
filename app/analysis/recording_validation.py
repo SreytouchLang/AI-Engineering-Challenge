@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-import json
+import hashlib
 import subprocess
 import wave
 from pathlib import Path
@@ -10,6 +10,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from app.analysis.transcript import TranscriptDocument
 from app.storage.artifacts import ArtifactPaths
 from app.storage.metadata import CallMetadata
+from app.voice.audio import audio_duration_seconds
 
 
 class RecordingValidationIssue(BaseModel):
@@ -31,11 +32,11 @@ class RecordingValidationReport(BaseModel):
 
     def render_markdown(self) -> str:
         lines = [f"## {self.call_id}", ""]
-        for name, value in self.checks.items():
-            lines.append(f"- {name}: `{value}`")
+        for name, check_value in self.checks.items():
+            lines.append(f"- {name}: `{check_value}`")
         lines.extend(["", "Metrics:"])
-        for name, value in self.metrics.items():
-            lines.append(f"- {name}: `{value}`")
+        for name, metric_value in self.metrics.items():
+            lines.append(f"- {name}: `{metric_value}`")
         lines.extend(["", "Issues:"])
         if not self.issues:
             lines.append("- None")
@@ -68,36 +69,35 @@ class RecordingValidator:
         mixed_path = self._select_mixed_recording(paths)
 
         exists = mixed_path is not None and mixed_path.exists()
-        supported_format = exists and mixed_path.suffix.lower() in {".mp3", ".ogg"}
-        nonzero_size = exists and mixed_path.stat().st_size > 0
+        supported_format = False
+        nonzero_size = False
+        if mixed_path is not None and exists:
+            supported_format = mixed_path.suffix.lower() in {".mp3", ".ogg"}
+            nonzero_size = mixed_path.stat().st_size > 0
         decodable = False
         duration_seconds = 0.0
-        if exists and supported_format and nonzero_size:
+        if mixed_path is not None and supported_format and nonzero_size:
             try:
                 duration_seconds = self._duration_seconds(mixed_path)
                 decodable = duration_seconds > 0
             except Exception:
                 decodable = False
 
-        patient_audible = paths.patient_recording.exists() and self._has_audio_energy(
-            paths.patient_recording
-        )
-        agent_audible = paths.agent_recording.exists() and self._has_audio_energy(
-            paths.agent_recording
-        )
-        both_speakers_audible = patient_audible and agent_audible
-        mixed_not_silent = exists and self._has_audio_energy(mixed_path) if exists else False
-        clipping_events = self._clipping_events(mixed_path) if exists else 0
-        longest_silence_ms = self._longest_silence_ms(mixed_path) if exists else 0
+        channel_artifacts_available = paths.patient_recording.exists() and paths.agent_recording.exists()
+        patient_audible = paths.patient_recording.exists() and self._has_audio_energy(paths.patient_recording)
+        agent_audible = paths.agent_recording.exists() and self._has_audio_energy(paths.agent_recording)
+        both_speakers_audible = patient_audible and agent_audible if channel_artifacts_available else True
+        mixed_not_silent = self._has_audio_energy(mixed_path) if mixed_path is not None and exists else False
+        clipping_events = self._clipping_events(mixed_path) if mixed_path is not None else 0
+        longest_silence_ms = self._longest_silence_ms(mixed_path) if mixed_path is not None else 0
+        checksum_sha256 = self._checksum_sha256(mixed_path) if mixed_path is not None and exists else None
         duration_matches_metadata = (
-            metadata.duration_seconds is not None
-            and abs(metadata.duration_seconds - duration_seconds) <= self.duration_tolerance_seconds
+            metadata.duration_seconds is not None and abs(metadata.duration_seconds - duration_seconds) <= self.duration_tolerance_seconds
             if decodable
             else False
         )
         transcript_matches_audio = (
-            transcript is not None
-            and abs(transcript.duration_seconds - duration_seconds) <= self.duration_tolerance_seconds
+            transcript is not None and abs(transcript.duration_seconds - duration_seconds) <= self.duration_tolerance_seconds
             if decodable
             else False
         )
@@ -107,12 +107,14 @@ class RecordingValidator:
             "supported_public_format": bool(supported_format),
             "nonzero_size": bool(nonzero_size),
             "decoder_can_open": bool(decodable),
+            "channel_artifacts_available": channel_artifacts_available,
             "both_speakers_audible": both_speakers_audible,
             "audio_not_silent": mixed_not_silent,
             "no_excessive_clipping": clipping_events <= 1,
             "no_long_unexplained_silence": longest_silence_ms <= self.long_silence_threshold_ms,
             "duration_matches_metadata": duration_matches_metadata,
             "duration_matches_transcript": transcript_matches_audio if transcript is not None else True,
+            "checksum_generated": checksum_sha256 is not None,
         }
 
         if not checks["recording_exists"]:
@@ -123,7 +125,7 @@ class RecordingValidator:
             issues.append(self._issue("empty_recording", "high", "Recording file size is zero."))
         if exists and not checks["decoder_can_open"]:
             issues.append(self._issue("decode_failed", "high", "Recording could not be decoded."))
-        if exists and not checks["both_speakers_audible"]:
+        if channel_artifacts_available and exists and not checks["both_speakers_audible"]:
             issues.append(
                 self._issue(
                     "missing_speaker_audio",
@@ -169,12 +171,17 @@ class RecordingValidator:
                 "duration_seconds": round(duration_seconds, 2),
                 "clipping_events": clipping_events,
                 "longest_silence_ms": longest_silence_ms,
+                "checksum_sha256": checksum_sha256 or "missing",
             },
             issues=issues,
         )
 
     def _select_mixed_recording(self, paths: ArtifactPaths) -> Path | None:
-        for candidate in (paths.mixed_recording, paths.recording):
+        for candidate in (paths.recording, paths.mixed_recording):
+            if candidate.exists():
+                return candidate
+        for suffix in (".mp3", ".ogg", ".wav"):
+            candidate = paths.recording.with_suffix(suffix)
             if candidate.exists():
                 return candidate
         for suffix in (".mp3", ".ogg", ".wav"):
@@ -184,26 +191,7 @@ class RecordingValidator:
         return None
 
     def _duration_seconds(self, path: Path) -> float:
-        if path.suffix.lower() == ".wav":
-            with wave.open(str(path), "rb") as wav_file:
-                return wav_file.getnframes() / float(wav_file.getframerate())
-        result = subprocess.run(
-            [
-                "ffprobe",
-                "-v",
-                "error",
-                "-show_entries",
-                "format=duration",
-                "-of",
-                "json",
-                str(path),
-            ],
-            check=True,
-            capture_output=True,
-            text=True,
-        )
-        payload = json.loads(result.stdout or "{}")
-        return float(payload.get("format", {}).get("duration", 0.0))
+        return audio_duration_seconds(path)
 
     def _pcm_samples(self, path: Path) -> list[int]:
         if path.suffix.lower() == ".wav":
@@ -277,6 +265,13 @@ class RecordingValidator:
             else:
                 current = 0
         return longest
+
+    def _checksum_sha256(self, path: Path) -> str:
+        digest = hashlib.sha256()
+        with path.open("rb") as handle:
+            for chunk in iter(lambda: handle.read(8192), b""):
+                digest.update(chunk)
+        return digest.hexdigest()
 
     def _issue(self, code: str, severity: str, message: str) -> RecordingValidationIssue:
         return RecordingValidationIssue(code=code, severity=severity, message=message)

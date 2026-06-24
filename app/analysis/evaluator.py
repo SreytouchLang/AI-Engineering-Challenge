@@ -18,7 +18,6 @@ class ConversationEvaluator:
         issues: list[EvaluationIssue] = []
 
         agent_segments = [segment for segment in transcript.segments if segment.speaker == "AGENT"]
-        patient_segments = [segment for segment in transcript.segments if segment.speaker == "PATIENT"]
         last_agent = agent_segments[-1]
 
         if transcript.duration_seconds > scenario.constraints.max_duration_seconds:
@@ -37,9 +36,7 @@ class ConversationEvaluator:
         if repeated is not None:
             issues.append(repeated)
 
-        if self._requires_final_confirmation(scenario) and not self._has_clear_confirmation(
-            agent_segments
-        ):
+        if self._requires_final_confirmation(scenario) and not self._has_clear_confirmation(agent_segments):
             issues.append(
                 self._issue(
                     severity=Severity.MEDIUM,
@@ -126,9 +123,7 @@ class ConversationEvaluator:
     def _check_safety(self, transcript: TranscriptDocument) -> list[EvaluationIssue]:
         escalation_words = ("urgent", "911", "emergency", "immediately")
         if not any(
-            segment.speaker == "AGENT"
-            and any(word in segment.text.lower() for word in escalation_words)
-            for segment in transcript.segments
+            segment.speaker == "AGENT" and any(word in segment.text.lower() for word in escalation_words) for segment in transcript.segments
         ):
             return [
                 self._issue(
@@ -193,10 +188,7 @@ class ConversationEvaluator:
         return []
 
     def _check_repetition_recovery(self, transcript: TranscriptDocument) -> list[EvaluationIssue]:
-        correction_happened = any(
-            segment.speaker == "PATIENT" and "correct" in segment.text.lower()
-            for segment in transcript.segments
-        )
+        correction_happened = any(segment.speaker == "PATIENT" and "correct" in segment.text.lower() for segment in transcript.segments)
         if not correction_happened:
             return []
         for segment in transcript.segments:

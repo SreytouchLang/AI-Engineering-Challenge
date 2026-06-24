@@ -10,9 +10,7 @@ E164_PATTERN = re.compile(r"^\+[1-9]\d{9,14}$")
 SECRET_PATTERNS = (
     re.compile(r"sk-[A-Za-z0-9]{20,}"),
     re.compile(r"AC[a-fA-F0-9]{32}"),
-    re.compile(
-        r"(?im)(?:api[_-]?key|auth[_-]?token)[ \t]*[:=][ \t]*['\"]?([A-Za-z0-9_\-]{12,})['\"]?"
-    ),
+    re.compile(r"(?im)(?:api[_-]?key|auth[_-]?token)[ \t]*[:=][ \t]*['\"]?([A-Za-z0-9_\-]{12,})['\"]?"),
 )
 
 
@@ -42,17 +40,13 @@ def validate_destination(number: str) -> str:
 
     normalized = normalize_e164(number)
     if normalized != AUTHORIZED_DESTINATION:
-        raise ValueError(
-            f"Blocked outbound call to unauthorized destination: {normalized}"
-        )
+        raise ValueError(f"Blocked outbound call to unauthorized destination: {normalized}")
     return normalized
 
 
 def ensure_real_calls_enabled(enabled: bool) -> None:
     if not enabled:
-        raise RuntimeError(
-            "Real calls are disabled. Re-run with ENABLE_REAL_CALLS=true to continue."
-        )
+        raise RuntimeError("Real calls are disabled. Re-run with ENABLE_REAL_CALLS=true to continue.")
 
 
 def mask_phone_number(number: str | None) -> str | None:
@@ -62,6 +56,23 @@ def mask_phone_number(number: str | None) -> str | None:
     if len(normalized) <= 6:
         return normalized
     return f"{normalized[:3]}***{normalized[-4:]}"
+
+
+def redact_phone_number(number: str | None) -> str | None:
+    if number is None:
+        return None
+    normalized = normalize_e164(number)
+    if normalized.startswith("+1") and len(normalized) == 12:
+        return "+1" + ("*" * 10)
+    visible_prefix = normalized[:2] if len(normalized) > 2 else normalized
+    return visible_prefix + ("*" * max(0, len(normalized) - len(visible_prefix)))
+
+
+def format_phone_number_for_display(number: str) -> str:
+    normalized = normalize_e164(number)
+    if normalized.startswith("+1") and len(normalized) == 12:
+        return f"+1-{normalized[2:5]}-{normalized[5:8]}-{normalized[8:12]}"
+    return normalized
 
 
 def find_secret_like_values(text: str) -> list[str]:
@@ -95,12 +106,8 @@ class RunBudget:
 
     def reserve_call(self, estimated_cost_usd: float) -> None:
         if self.calls_started >= self.max_calls_per_run:
-            raise RuntimeError(
-                f"Call limit reached for this run ({self.max_calls_per_run})."
-            )
+            raise RuntimeError(f"Call limit reached for this run ({self.max_calls_per_run}).")
         if self.projected_cost_usd + estimated_cost_usd > self.monthly_cost_limit_usd:
-            raise RuntimeError(
-                "Projected cost would exceed MONTHLY_COST_LIMIT_USD."
-            )
+            raise RuntimeError("Projected cost would exceed MONTHLY_COST_LIMIT_USD.")
         self.calls_started += 1
         self.projected_cost_usd += estimated_cost_usd

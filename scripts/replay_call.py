@@ -38,9 +38,7 @@ def main() -> None:
 
     metadata = CallMetadata.model_validate_json(paths.metadata_json.read_text(encoding="utf-8"))
     transcript = TranscriptDocument.model_validate_json(paths.transcript_json.read_text(encoding="utf-8"))
-    scenarios = {
-        scenario.id: scenario for scenario in load_scenarios(settings.project_root / "scenarios")
-    }
+    scenarios = {scenario.id: scenario for scenario in load_scenarios(settings.project_root / "scenarios")}
 
     validation = TranscriptValidator(
         gap_threshold_ms=settings.transcript_gap_threshold_ms,
@@ -64,11 +62,7 @@ def main() -> None:
     replayed_evaluation.transcript_validation_passed = validation.passed
     replayed_evaluation.quality_score = quality.overall_score
 
-    original_evaluation = (
-        artifact_store.load_evaluation(args.call_id)
-        if paths.evaluation_json.exists()
-        else None
-    )
+    original_evaluation = artifact_store.load_evaluation(args.call_id) if paths.evaluation_json.exists() else None
     comparison = {
         "call_id": args.call_id,
         "original_issue_count": len(original_evaluation.issues) if original_evaluation else 0,

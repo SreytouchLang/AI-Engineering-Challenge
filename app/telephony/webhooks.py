@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+from datetime import UTC, datetime
+
 from fastapi import APIRouter, Request, Response, WebSocket, WebSocketDisconnect
+from starlette.datastructures import FormData
 
 from app.config import get_settings
 from app.storage.artifacts import ArtifactStore
@@ -12,6 +15,15 @@ artifact_store = ArtifactStore(settings.artifacts_root)
 session_registry = MediaStreamSessionRegistry(settings, artifact_store)
 
 router = APIRouter()
+
+
+def _form_string(form: FormData, key: str) -> str | None:
+    value = form.get(key)
+    return value if isinstance(value, str) and value else None
+
+
+def _terminal_call_status(status: str | None) -> bool:
+    return status in {"completed", "busy", "failed", "no-answer", "canceled"}
 
 
 @router.get("/health")
@@ -27,13 +39,17 @@ async def status_callback(request: Request) -> Response:
         path = artifact_store.paths_for(call_id).metadata_json
         if path.exists():
             metadata = CallMetadata.model_validate_json(path.read_text(encoding="utf-8"))
+            call_status = _form_string(form, "CallStatus") or metadata.call_status
             updated = metadata.model_copy(
                 update={
-                    "provider_call_id": form.get("CallSid") or metadata.provider_call_id,
-                    "call_status": form.get("CallStatus") or metadata.call_status,
-                    "duration_seconds": float(form["CallDuration"])
-                    if form.get("CallDuration")
+                    "provider": "twilio",
+                    "is_real_call": True,
+                    "provider_call_id": _form_string(form, "CallSid") or metadata.provider_call_id,
+                    "call_status": call_status,
+                    "duration_seconds": float(call_duration)
+                    if (call_duration := _form_string(form, "CallDuration")) is not None
                     else metadata.duration_seconds,
+                    "end_time": datetime.now(UTC) if _terminal_call_status(call_status) else metadata.end_time,
                 }
             )
             artifact_store.write_metadata(updated)
@@ -48,19 +64,31 @@ async def recording_callback(request: Request) -> Response:
         path = artifact_store.paths_for(call_id).metadata_json
         if path.exists():
             metadata = CallMetadata.model_validate_json(path.read_text(encoding="utf-8"))
+            recording_status = _form_string(form, "RecordingStatus") or metadata.provider_recording_status
+            problems = list(metadata.problems)
+            if recording_status in {"absent", "failed"}:
+                problems.append(f"Provider recording callback reported status={recording_status}.")
             updated = metadata.model_copy(
                 update={
-                    "provider_call_id": form.get("CallSid") or metadata.provider_call_id,
-                    "provider_recording_id": form.get("RecordingSid")
-                    or metadata.provider_recording_id,
-                    "provider_recording_status": form.get("RecordingStatus")
-                    or metadata.provider_recording_status,
-                    "provider_recording_channels": form.get("RecordingChannels")
-                    or metadata.provider_recording_channels,
-                    "provider_recording_source": form.get("RecordingSource")
-                    or metadata.provider_recording_source,
-                    "provider_recording_url": form.get("RecordingUrl")
-                    or metadata.provider_recording_url,
+                    "provider": "twilio",
+                    "is_real_call": True,
+                    "provider_call_id": _form_string(form, "CallSid") or metadata.provider_call_id,
+                    "provider_recording_id": _form_string(form, "RecordingSid") or metadata.provider_recording_id,
+                    "provider_recording_status": recording_status,
+                    "provider_recording_channels": _form_string(form, "RecordingChannels") or metadata.provider_recording_channels,
+                    "provider_recording_source": _form_string(form, "RecordingSource") or metadata.provider_recording_source,
+                    "provider_recording_url": _form_string(form, "RecordingUrl") or metadata.provider_recording_url,
+                    "provider_recording_duration_seconds": float(recording_duration)
+                    if (recording_duration := _form_string(form, "RecordingDuration")) is not None
+                    else metadata.provider_recording_duration_seconds,
+                    "recording_download_status": (
+                        "ready_to_fetch"
+                        if recording_status == "completed"
+                        else "failed"
+                        if recording_status in {"absent", "failed"}
+                        else metadata.recording_download_status
+                    ),
+                    "problems": problems,
                 }
             )
             artifact_store.write_metadata(updated)

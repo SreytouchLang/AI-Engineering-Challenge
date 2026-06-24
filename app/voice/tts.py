@@ -5,7 +5,7 @@ import time
 from dataclasses import dataclass
 from typing import Protocol
 
-from openai import OpenAI
+from openai import Omit, OpenAI
 
 from app.voice.audio import duration_ms_from_mulaw, duration_ms_from_text, wav_to_mulaw
 
@@ -19,8 +19,7 @@ class SynthesisResult:
 
 
 class SpeechSynthesisClient(Protocol):
-    def synthesize(self, text: str, instructions: str | None = None) -> SynthesisResult:
-        ...
+    def synthesize(self, text: str, instructions: str | None = None) -> SynthesisResult: ...
 
 
 class OpenAITtsClient:
@@ -32,11 +31,12 @@ class OpenAITtsClient:
     def synthesize(self, text: str, instructions: str | None = None) -> SynthesisResult:
         started = time.perf_counter()
         buffer = io.BytesIO()
+        request_instructions: str | Omit = instructions if instructions is not None else Omit()
         with self.client.audio.speech.with_streaming_response.create(
             model=self.model,
             voice=self.voice,
             input=text,
-            instructions=instructions,
+            instructions=request_instructions,
             response_format="wav",
         ) as response:
             for chunk in response.iter_bytes():
@@ -64,4 +64,3 @@ class SilentSpeechSynthesisClient:
             latency_ms=0.0,
             duration_ms=duration_ms,
         )
-

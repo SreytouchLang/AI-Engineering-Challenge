@@ -16,24 +16,34 @@ from app.submission import is_provider_confirmed_live_call, list_call_bundles
 def main() -> None:
     settings = get_settings()
     artifact_store = ArtifactStore(settings.artifacts_root)
-    bundles = [
-        bundle
-        for bundle in list_call_bundles(artifact_store)
-        if is_provider_confirmed_live_call(bundle.metadata) and bundle.transcript is not None
-    ]
     validator = TranscriptValidator(
         gap_threshold_ms=settings.transcript_gap_threshold_ms,
         confidence_threshold=settings.transcript_confidence_threshold,
         duration_tolerance_seconds=settings.duration_mismatch_tolerance_seconds,
     )
+    bundles = []
     reports = []
-    for bundle in bundles:
+    for bundle in list_call_bundles(artifact_store):
+        if not is_provider_confirmed_live_call(bundle.metadata):
+            continue
+        transcript = bundle.transcript
+        if transcript is None:
+            continue
+        bundles.append(bundle)
         report = validator.validate(
-            transcript=bundle.transcript,
+            transcript=transcript,
             metadata=bundle.metadata,
             paths=bundle.paths,
         )
         reports.append(report)
+        updated = bundle.metadata.model_copy(
+            update={
+                "transcript_validation_path": f"artifacts/validation/{bundle.paths.validation_json.name}",
+                "transcript_validation_status": "passed" if report.passed else "failed",
+                "average_transcript_confidence": report.average_confidence,
+            }
+        )
+        artifact_store.write_metadata(updated)
 
     output_path = settings.project_root / "TRANSCRIPT_VALIDATION_REPORT.md"
     lines = ["# Transcript Validation Report", ""]

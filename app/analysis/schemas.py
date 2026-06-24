@@ -1,11 +1,11 @@
 from __future__ import annotations
 
-from enum import Enum
+from enum import StrEnum
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 
-class Severity(str, Enum):
+class Severity(StrEnum):
     CRITICAL = "critical"
     HIGH = "high"
     MEDIUM = "medium"
@@ -68,7 +68,7 @@ class CallEvaluation(BaseModel):
     quality_score: int | None = None
 
     @model_validator(mode="after")
-    def _require_evidence(self) -> "CallEvaluation":
+    def _require_evidence(self) -> CallEvaluation:
         for issue in self.issues:
             if not issue.evidence or not issue.timestamp:
                 raise ValueError("Each evaluation issue must include evidence and a timestamp.")

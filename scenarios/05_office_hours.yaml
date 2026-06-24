@@ -9,6 +9,9 @@ background:
   reason: office logistics
   details:
     target_day: Friday
+    hours: Monday through Friday, 8 AM to 5 PM
+    address: 240 Harbor Avenue
+    parking: visitor parking in the south lot
 goal:
   primary: Learn hours, location, parking, and whether the office is open on a specific day.
   acceptable_outcomes:
@@ -36,4 +39,3 @@ follow_up_questions:
 failure_signals:
   - Inconsistent logistics details
 desired_outcome: Get a clear explanation of hours, location, parking, and day-specific availability.
-

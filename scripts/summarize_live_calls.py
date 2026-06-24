@@ -27,7 +27,7 @@ def _checkbox(value: bool | None) -> str:
 
 def _manual_review_section(bundle) -> str:
     review = bundle.quality.human_review if bundle.quality is not None else None
-    recording_target = bundle.metadata.mixed_recording_path or bundle.metadata.recording_path or ""
+    recording_target = bundle.metadata.recording_path or bundle.metadata.mixed_recording_path or ""
     transcript_target = bundle.metadata.transcript_path or ""
     if review is None:
         return "\n".join(
@@ -41,17 +41,17 @@ def _manual_review_section(bundle) -> str:
                 "",
                 "- [ ] Listened from beginning to end",
                 "- [ ] Both speakers are audible",
-                "- [ ] Patient sounds natural",
                 "- [ ] Conversation is coherent",
-                "- [ ] Turn-taking is sensible",
+                "- [ ] Patient sounds natural",
+                "- [ ] Turn-taking is acceptable",
                 "- [ ] No major audio glitches",
-                "- [ ] No excessive delay",
-                "- [ ] Scenario objective was pursued",
+                "- [ ] No severe latency",
+                "- [ ] Scenario goal was pursued",
                 "- [ ] Final outcome is clear",
                 "- [ ] Approved for submission",
                 "",
                 "Reviewer:",
-                "Review date:",
+                "Date:",
                 "Naturalness score:",
                 "Notes:",
                 "",
@@ -69,17 +69,17 @@ def _manual_review_section(bundle) -> str:
             "",
             f"- {_checkbox(review.played_from_beginning_to_end)} Listened from beginning to end",
             f"- {_checkbox(review.both_speakers_audible)} Both speakers are audible",
-            f"- {_checkbox(review.patient_sounds_natural)} Patient sounds natural",
             f"- {_checkbox(review.conversation_coherent)} Conversation is coherent",
-            f"- {_checkbox(review.turn_taking_sensible)} Turn-taking is sensible",
+            f"- {_checkbox(review.patient_sounds_natural)} Patient sounds natural",
+            f"- {_checkbox(review.turn_taking_sensible)} Turn-taking is acceptable",
             f"- {_checkbox(review.no_major_audio_glitches)} No major audio glitches",
-            f"- {_checkbox(review.no_excessive_delay)} No excessive delay",
-            f"- {_checkbox(review.scenario_objective_pursued)} Scenario objective was pursued",
+            f"- {_checkbox(review.no_excessive_delay)} No severe latency",
+            f"- {_checkbox(review.scenario_objective_pursued)} Scenario goal was pursued",
             f"- {_checkbox(review.final_outcome_clear)} Final outcome is clear",
             f"- {_checkbox(review.approved_for_submission)} Approved for submission",
             "",
             f"Reviewer: {review.reviewer or ''}",
-            f"Review date: {review.review_date or ''}",
+            f"Date: {review.review_date or ''}",
             f"Naturalness score: {review.naturalness or ''}",
             f"Notes: {review.reviewer_notes or ''}",
             "",
@@ -96,17 +96,18 @@ def main() -> None:
     tracker_lines = [
         "# Live Call Progress",
         "",
-        "| Call | Scenario | Provider-confirmed | Recording | Transcript | Validated | Manually reviewed | Selected |",
-        "| ---- | -------- | ------------------ | --------- | ---------- | --------- | ----------------- | -------- |",
+        "| Call | Scenario | Provider confirmed | MP3/OGG | Two speakers | Transcript valid | Manual review | Selected |",
+        "| ---- | -------- | ------------------ | ------- | ------------ | ---------------- | ------------- | -------- |",
     ]
     for bundle in live_bundles:
+        two_speakers = bundle.transcript is not None and {"PATIENT", "AGENT"} <= {segment.speaker for segment in bundle.transcript.segments}
         tracker_lines.append(
-            "| {call} | {scenario} | {provider} | {recording} | {transcript} | {validated} | {reviewed} | {selected} |".format(
+            "| {call} | {scenario} | {provider} | {recording} | {two_speakers} | {validated} | {reviewed} | {selected} |".format(
                 call=bundle.call_id,
                 scenario=bundle.metadata.scenario_id,
                 provider="Yes",
                 recording="Yes" if has_required_recording(bundle) else "No",
-                transcript="Yes" if bundle.transcript is not None else "No",
+                two_speakers="Yes" if two_speakers else "No",
                 validated="Yes" if transcript_is_valid(bundle) else "No",
                 reviewed="Yes" if manual_review_completed(bundle) else "No",
                 selected="Yes" if selected_for_submission(bundle) else "No",
@@ -133,13 +134,14 @@ def main() -> None:
     total_real_calls = len(live_bundles)
     valid_real_calls = sum(1 for bundle in live_bundles if real_call_is_complete(bundle))
     failed_calls = sum(1 for bundle in live_bundles if bundle.metadata.call_status != "completed")
-    recordings = sum(1 for bundle in live_bundles if has_required_recording(bundle))
-    transcripts = sum(1 for bundle in live_bundles if bundle.transcript is not None)
+    recordings = sum(
+        1 for bundle in live_bundles if has_required_recording(bundle) and bundle.metadata.recording_validation_status == "passed"
+    )
+    transcripts = sum(
+        1 for bundle in live_bundles if bundle.transcript is not None and bundle.metadata.transcript_validation_status == "passed"
+    )
     manual_approvals = sum(
-        1
-        for bundle in live_bundles
-        if bundle.quality is not None
-        and bundle.quality.human_review.approved_for_submission is True
+        1 for bundle in live_bundles if bundle.quality is not None and bundle.quality.human_review.approved_for_submission is True
     )
     selected_calls = sum(1 for bundle in live_bundles if selected_for_submission(bundle))
     remaining = max(0, 10 - selected_calls)

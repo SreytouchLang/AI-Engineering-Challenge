@@ -34,9 +34,7 @@ def main() -> None:
     transcript_path = paths.transcript_json
 
     metadata = CallMetadata.model_validate_json(metadata_path.read_text(encoding="utf-8"))
-    transcript = TranscriptDocument.model_validate_json(
-        transcript_path.read_text(encoding="utf-8")
-    )
+    transcript = TranscriptDocument.model_validate_json(transcript_path.read_text(encoding="utf-8"))
     validation = TranscriptValidator(
         gap_threshold_ms=settings.transcript_gap_threshold_ms,
         confidence_threshold=settings.transcript_confidence_threshold,
@@ -58,15 +56,13 @@ def main() -> None:
     artifact_store.write_model_json(paths.quality_json, quality)
     artifact_store.write_markdown(paths.quality_md, quality.render_markdown())
 
-    scenarios = {
-        scenario.id: scenario for scenario in load_scenarios(settings.project_root / "scenarios")
-    }
+    scenarios = {scenario.id: scenario for scenario in load_scenarios(settings.project_root / "scenarios")}
     evaluation = ConversationEvaluator().evaluate(
         scenario=scenarios[metadata.scenario_id],
         transcript=transcript,
     )
     for issue in evaluation.issues:
-        issue.recording_path = metadata.mixed_recording_path or metadata.recording_path
+        issue.recording_path = metadata.recording_path or metadata.mixed_recording_path
         issue.transcript_path = metadata.transcript_path
         issue.evidence_excerpt = issue.evidence[:180]
         issue.actual_behavior = issue.actual_behavior or issue.evidence

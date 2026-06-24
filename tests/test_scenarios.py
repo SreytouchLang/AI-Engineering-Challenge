@@ -58,4 +58,3 @@ def test_patient_identity_cannot_change_mid_conversation() -> None:
     )
     with pytest.raises(ValueError):
         state.ensure_identity_consistency("Other Name")
-

@@ -3,11 +3,12 @@ from __future__ import annotations
 from datetime import date
 
 import pytest
+from pydantic import AnyHttpUrl, TypeAdapter
 from twilio.base.exceptions import TwilioException
 
 from app.agent.scenario_loader import load_scenario
 from app.analysis.evaluator import ConversationEvaluator
-from app.analysis.schemas import CallEvaluation, EvaluationIssue, EvaluationScores
+from app.analysis.schemas import CallEvaluation, EvaluationIssue, EvaluationScores, Severity
 from app.analysis.transcript import TranscriptDocument, TranscriptSegment
 from app.config import AppSettings, get_settings
 from app.telephony.client import TwilioTelephonyClient
@@ -36,9 +37,7 @@ def make_transcript(agent_lines: list[str]) -> TranscriptDocument:
 
 
 def test_evaluator_flags_weekend_confirmation_bug() -> None:
-    scenario = load_scenario(
-        get_settings().project_root / "scenarios" / "07_weekend_request.yaml"
-    )
+    scenario = load_scenario(get_settings().project_root / "scenarios" / "07_weekend_request.yaml")
     transcript = TranscriptDocument(
         call_id="call-007",
         scenario_id=scenario.id,
@@ -64,9 +63,7 @@ def test_evaluator_flags_weekend_confirmation_bug() -> None:
 
 
 def test_evaluator_does_not_flag_cautious_insurance_language() -> None:
-    scenario = load_scenario(
-        get_settings().project_root / "scenarios" / "06_insurance.yaml"
-    )
+    scenario = load_scenario(get_settings().project_root / "scenarios" / "06_insurance.yaml")
     transcript = TranscriptDocument(
         call_id="call-006",
         scenario_id=scenario.id,
@@ -127,7 +124,7 @@ def test_call_evaluation_requires_issue_evidence() -> None:
             issues=[
                 EvaluationIssue(
                     title="Missing evidence",
-                    severity="low",
+                    severity=Severity.LOW,
                     category="test",
                     timestamp="",
                     evidence="",
@@ -154,7 +151,7 @@ def test_telephony_client_surfaces_provider_errors(monkeypatch: pytest.MonkeyPat
         telephony_account_id="acct",
         telephony_auth_token="token",
         telephony_from_number="+15555550123",
-        public_base_url="https://example.com",
+        public_base_url=TypeAdapter(AnyHttpUrl).validate_python("https://example.com"),
     )
     client = TwilioTelephonyClient(settings)
     with pytest.raises(RuntimeError, match="Telephony provider error"):

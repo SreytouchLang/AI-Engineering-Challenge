@@ -15,14 +15,13 @@ from app.submission import (
     has_required_recording,
     list_call_bundles,
     manual_review_completed,
-    public_repository_audit_verified,
     public_repository_accessible,
+    public_repository_audit_verified,
     real_call_is_complete,
     selected_for_submission,
     submission_form_ready,
     transcript_is_valid,
 )
-
 
 REPO_URL = "https://github.com/SreytouchLang/AI-Engineering-Challenge"
 
@@ -35,6 +34,8 @@ def _replace_checkbox(content: str, label: str, checked: bool) -> str:
 
 def _loom_fields_populated(readme_text: str) -> bool:
     return "Main walkthrough: `TBD`" not in readme_text and "AI debugging walkthrough: `TBD`" not in readme_text
+
+
 def main() -> None:
     settings = get_settings()
     artifact_store = ArtifactStore(settings.artifacts_root)

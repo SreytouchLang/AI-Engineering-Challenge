@@ -1,7 +1,7 @@
 from __future__ import annotations
 
+from collections.abc import Callable
 from pathlib import Path
-from typing import Callable
 
 from app.analysis.schemas import CallEvaluation, EvaluationIssue, Severity
 from app.storage.metadata import CallMetadata
@@ -15,10 +15,7 @@ def review_issues(
     for evaluation in evaluations:
         for issue in evaluation.issues:
             while True:
-                answer = input_fn(
-                    f"[{evaluation.call_id}] {issue.title} "
-                    "(a=approve, r=reject, e=edit, s=skip): "
-                ).strip().lower()
+                answer = input_fn(f"[{evaluation.call_id}] {issue.title} (a=approve, r=reject, e=edit, s=skip): ").strip().lower()
                 if answer == "a":
                     issue.review_status = "approved"
                     break
@@ -47,7 +44,7 @@ def build_bug_report(
         metadata = metadata_by_call.get(evaluation.call_id)
         if metadata is None or not is_provider_confirmed_live_call(metadata):
             continue
-        if metadata.transcript_validation_status != "passed":
+        if metadata.transcript_validation_status != "passed" or metadata.recording_validation_status != "passed":
             continue
         included_calls.add(evaluation.call_id)
         for issue in evaluation.issues:
@@ -79,14 +76,15 @@ def build_bug_report(
     lines.extend(["", ""])
 
     if not issues:
-        lines.append("No approved bugs yet. Run `python scripts/analyze_call.py` and `python scripts/build_report.py --review` after real calls exist.")
+        lines.append(
+            "No approved bugs yet. Run `python scripts/analyze_call.py` and "
+            "`python scripts/build_report.py --review` after real calls exist."
+        )
     else:
         for index, (evaluation, issue) in enumerate(issues, start=1):
             metadata = metadata_by_call.get(evaluation.call_id)
             transcript_link = issue.transcript_path or (metadata.transcript_path if metadata else None)
-            recording_link = issue.recording_path or (
-                metadata.mixed_recording_path or metadata.recording_path if metadata else None
-            )
+            recording_link = issue.recording_path or (metadata.recording_path or metadata.mixed_recording_path if metadata else None)
             relative_transcript = transcript_link or f"artifacts/transcripts/{evaluation.call_id}.txt"
             relative_recording = recording_link or f"artifacts/recordings/{evaluation.call_id}-mixed.mp3"
             lines.extend(
@@ -120,11 +118,18 @@ def build_bug_report(
                     "",
                     "### Reproduction steps",
                     "",
-                    *[f"{step_index}. {step}" for step_index, step in enumerate(issue.reproduction_steps or [
-                        "Run the scenario associated with this call.",
-                        "Listen at the cited timestamp and compare against the transcript.",
-                        "Observe whether the agent repeats the same failure mode.",
-                    ], start=1)],
+                    *[
+                        f"{step_index}. {step}"
+                        for step_index, step in enumerate(
+                            issue.reproduction_steps
+                            or [
+                                "Run the scenario associated with this call.",
+                                "Listen at the cited timestamp and compare against the transcript.",
+                                "Observe whether the agent repeats the same failure mode.",
+                            ],
+                            start=1,
+                        )
+                    ],
                     "",
                 ]
             )
@@ -145,7 +150,7 @@ def build_bug_review_queue(
         metadata = metadata_by_call.get(evaluation.call_id)
         if metadata is None or not is_provider_confirmed_live_call(metadata):
             continue
-        if metadata.transcript_validation_status != "passed":
+        if metadata.transcript_validation_status != "passed" or metadata.recording_validation_status != "passed":
             continue
         for issue in evaluation.issues:
             if not _issue_is_reportable(issue):
@@ -162,8 +167,38 @@ def build_bug_review_queue(
                     f"**Category:** {issue.category}  ",
                     f"**Recording:** {issue.recording_path or metadata.mixed_recording_path or metadata.recording_path or ''}  ",
                     f"**Transcript:** {issue.transcript_path or metadata.transcript_path or ''}  ",
+                    f"**Confidence:** {issue.confidence:.2f}  ",
                     "",
-                    f"**Evidence:** {issue.evidence_excerpt or issue.evidence}",
+                    "**Actual behavior:**",
+                    "",
+                    issue.actual_behavior or issue.evidence,
+                    "",
+                    "**Expected behavior:**",
+                    "",
+                    issue.expected_behavior,
+                    "",
+                    "**User impact:**",
+                    "",
+                    issue.user_impact,
+                    "",
+                    "**Evidence:**",
+                    "",
+                    issue.evidence_excerpt or issue.evidence,
+                    "",
+                    "**Reproduction steps:**",
+                    "",
+                    *[
+                        f"{step_index}. {step}"
+                        for step_index, step in enumerate(
+                            issue.reproduction_steps
+                            or [
+                                "Run the scenario associated with this call.",
+                                "Open the cited recording and transcript.",
+                                "Compare the actual behavior against the expected behavior.",
+                            ],
+                            start=1,
+                        )
+                    ],
                     "",
                     "- [ ] Approve",
                     "- [ ] Reject",

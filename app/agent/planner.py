@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from enum import Enum
+from enum import StrEnum
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -8,7 +8,7 @@ from app.agent.scenario_loader import Scenario
 from app.agent.state import ConversationState
 
 
-class PatientActionType(str, Enum):
+class PatientActionType(StrEnum):
     ANSWER_QUESTION = "answer_question"
     ASK_FOLLOW_UP = "ask_follow_up"
     CLARIFY_REQUEST = "clarify_request"
@@ -393,7 +393,7 @@ class AdaptiveScenarioPlanner:
                 "The office asked for the initial preferred day.",
                 f"I was thinking {self._detail('initial_day')} at first.",
                 progress=self._goal_progress(0.25),
-                disclosed_facts={"preferred_day": self._detail('initial_day')},
+                disclosed_facts={"preferred_day": self._detail("initial_day")},
             )
         if "what is the visit for" in lower:
             return self._plan(
@@ -401,13 +401,16 @@ class AdaptiveScenarioPlanner:
                 "The office asked for the initial visit reason.",
                 f"It was for a {self._detail('initial_reason')}.",
                 progress=self._goal_progress(0.35),
-                disclosed_facts={"visit_reason": self._detail('initial_reason')},
+                disclosed_facts={"visit_reason": self._detail("initial_reason")},
             )
         if "does that work" in lower and "change_requested" not in self.state.facts_disclosed:
             return self._plan(
                 PatientActionType.CHANGE_PREFERENCE,
                 "The patient needs to revise both the day and the visit reason before the office finalizes the booking.",
-                f"Actually, could we switch it to {self._detail('changed_day')}? And it's really for {self._detail('changed_reason')} instead.",
+                (
+                    f"Actually, could we switch it to {self._detail('changed_day')}? "
+                    f"And it's really for {self._detail('changed_reason')} instead."
+                ),
                 progress=self._goal_progress(0.65),
                 disclosed_facts={
                     "change_requested": "yes",
@@ -528,4 +531,3 @@ class AdaptiveScenarioPlanner:
 
     def _fact(self, key: str) -> str | None:
         return self.scenario.facts.disclose_if_asked.get(key)
-

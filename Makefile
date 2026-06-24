@@ -1,9 +1,21 @@
 PYTHON ?= python3
 
-.PHONY: install test serve dry-run call suite analyze report replay experiment preflight validate-scenarios validate-recordings validate-transcripts live-progress rank-calls submission-check
+.PHONY: install format format-check lint typecheck test serve dry-run call fetch-recording transcribe-call suite analyze report replay experiment preflight validate-scenarios validate-recordings validate-transcripts live-progress rank-calls submission-check
 
 install:
 	$(PYTHON) -m pip install -r requirements.txt
+
+format:
+	$(PYTHON) -m ruff format .
+
+format-check:
+	$(PYTHON) -m ruff format --check .
+
+lint:
+	$(PYTHON) -m ruff check .
+
+typecheck:
+	$(PYTHON) -m mypy app scripts tests
 
 test:
 	$(PYTHON) -m pytest
@@ -16,6 +28,12 @@ dry-run:
 
 call:
 	ENABLE_REAL_CALLS=true $(PYTHON) scripts/run_call.py --scenario $(SCENARIO) --confirm-live-call=$(CONFIRM_REAL_CALL)
+
+fetch-recording:
+	$(PYTHON) scripts/fetch_recording.py --call-id $(CALL_ID)
+
+transcribe-call:
+	$(PYTHON) scripts/transcribe_call.py --call-id $(CALL_ID)
 
 suite:
 	$(PYTHON) scripts/run_suite.py

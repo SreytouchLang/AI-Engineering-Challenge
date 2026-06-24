@@ -36,11 +36,14 @@ class TurnManager:
         self.rms_threshold = rms_threshold
         self.min_speech_ms = min_speech_ms
         self.end_of_turn_silence_ms = end_of_turn_silence_ms
-        self.max_end_of_turn_silence_ms = (
-            max_end_of_turn_silence_ms
-            if max_end_of_turn_silence_ms is not None
-            else end_of_turn_silence_ms
-        )
+        self.max_end_of_turn_silence_ms = max_end_of_turn_silence_ms if max_end_of_turn_silence_ms is not None else end_of_turn_silence_ms
+        self.buffer: bytearray
+        self.in_speech: bool
+        self.turn_start_ms: int | None
+        self.last_speech_ms: int | None
+        self.speech_duration_ms: int
+        self.rms_total: float
+        self.samples_seen: int
         self._reset()
 
     def ingest_mulaw_frame(self, payload: bytes, timestamp_ms: int) -> TurnEvent:
@@ -68,12 +71,7 @@ class TurnManager:
 
         silence_ms = timestamp_ms - self.last_speech_ms if self.last_speech_ms is not None else 0
         required_silence_ms = self._required_silence_ms()
-        if (
-            self.in_speech
-            and not is_speech
-            and self.speech_duration_ms >= self.min_speech_ms
-            and silence_ms >= required_silence_ms
-        ):
+        if self.in_speech and not is_speech and self.speech_duration_ms >= self.min_speech_ms and silence_ms >= required_silence_ms:
             event.completed_turn = self._flush(timestamp_ms)
 
         return event
@@ -108,8 +106,8 @@ class TurnManager:
     def _reset(self) -> None:
         self.buffer = bytearray()
         self.in_speech = False
-        self.turn_start_ms: int | None = None
-        self.last_speech_ms: int | None = None
+        self.turn_start_ms = None
+        self.last_speech_ms = None
         self.speech_duration_ms = 0
         self.rms_total = 0.0
         self.samples_seen = 0

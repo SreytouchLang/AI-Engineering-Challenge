@@ -41,13 +41,11 @@ class TranscriptDocument(BaseModel):
     segments: list[TranscriptSegment]
 
     @model_validator(mode="after")
-    def _validate_ordering(self) -> "TranscriptDocument":
+    def _validate_ordering(self) -> TranscriptDocument:
         previous_start = -1.0
         for segment in self.segments:
             if segment.start_timestamp < previous_start:
-                raise ValueError(
-                    "Transcript segment start timestamps must be monotonically ordered."
-                )
+                raise ValueError("Transcript segment start timestamps must be monotonically ordered.")
             previous_start = segment.start_timestamp
         return self
 

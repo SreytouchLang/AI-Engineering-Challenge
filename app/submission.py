@@ -1,14 +1,14 @@
 from __future__ import annotations
 
+import subprocess
+from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
-import subprocess
-from typing import Iterable
 
 import httpx
 
 from app.analysis.quality import VoiceQualityReport
-from app.analysis.schemas import CallEvaluation
+from app.analysis.schemas import CallEvaluation, EvaluationIssue
 from app.analysis.transcript import TranscriptDocument
 from app.analysis.validation import TranscriptValidationReport
 from app.safety import AUTHORIZED_DESTINATION
@@ -36,21 +36,15 @@ def load_call_bundle(artifact_store: ArtifactStore, call_id: str) -> CallBundle:
         else None
     )
     evaluation = (
-        CallEvaluation.model_validate_json(paths.evaluation_json.read_text(encoding="utf-8"))
-        if paths.evaluation_json.exists()
-        else None
+        CallEvaluation.model_validate_json(paths.evaluation_json.read_text(encoding="utf-8")) if paths.evaluation_json.exists() else None
     )
     validation = (
-        TranscriptValidationReport.model_validate_json(
-            paths.validation_json.read_text(encoding="utf-8")
-        )
+        TranscriptValidationReport.model_validate_json(paths.validation_json.read_text(encoding="utf-8"))
         if paths.validation_json.exists()
         else None
     )
     quality = (
-        VoiceQualityReport.model_validate_json(paths.quality_json.read_text(encoding="utf-8"))
-        if paths.quality_json.exists()
-        else None
+        VoiceQualityReport.model_validate_json(paths.quality_json.read_text(encoding="utf-8")) if paths.quality_json.exists() else None
     )
     return CallBundle(
         call_id=call_id,
@@ -72,7 +66,8 @@ def list_call_bundles(artifact_store: ArtifactStore) -> list[CallBundle]:
 
 def is_provider_confirmed_live_call(metadata: CallMetadata) -> bool:
     return (
-        metadata.mode in {"live", "live_call"}
+        (metadata.is_real_call or metadata.mode in {"live", "live_call"})
+        and metadata.provider == "twilio"
         and metadata.destination_number == AUTHORIZED_DESTINATION
         and bool(metadata.provider_call_id)
     )
@@ -80,7 +75,9 @@ def is_provider_confirmed_live_call(metadata: CallMetadata) -> bool:
 
 def selected_for_submission(bundle: CallBundle) -> bool:
     return bool(
-        bundle.metadata.submission_ready
+        real_call_is_complete(bundle)
+        and manual_review_completed(bundle)
+        and bundle.metadata.submission_ready
         and bundle.quality is not None
         and bundle.quality.human_review.approved_for_submission is True
     )
@@ -90,12 +87,14 @@ def manual_review_completed(bundle: CallBundle) -> bool:
     return bundle.quality is not None and bundle.quality.human_review.is_completed()
 
 
-def approved_live_issues(bundle: CallBundle) -> list:
+def approved_live_issues(bundle: CallBundle) -> list[EvaluationIssue]:
     if bundle.evaluation is None or not is_provider_confirmed_live_call(bundle.metadata):
         return []
-    return [
-        issue for issue in bundle.evaluation.issues if issue.review_status == "approved"
-    ]
+    if bundle.metadata.recording_validation_status != "passed":
+        return []
+    if bundle.metadata.transcript_validation_status != "passed":
+        return []
+    return [issue for issue in bundle.evaluation.issues if issue.review_status == "approved"]
 
 
 def recording_artifact_path(bundle: CallBundle) -> Path | None:
@@ -111,17 +110,14 @@ def has_required_recording(bundle: CallBundle) -> bool:
 
 
 def transcript_is_valid(bundle: CallBundle) -> bool:
-    return (
-        bundle.transcript is not None
-        and bundle.validation is not None
-        and bundle.validation.passed
-    )
+    return bundle.transcript is not None and bundle.validation is not None and bundle.validation.passed
 
 
 def real_call_is_complete(bundle: CallBundle) -> bool:
     return bool(
         is_provider_confirmed_live_call(bundle.metadata)
         and bundle.metadata.call_status == "completed"
+        and bundle.metadata.recording_validation_status == "passed"
         and has_required_recording(bundle)
         and transcript_is_valid(bundle)
         and bundle.evaluation is not None
@@ -206,9 +202,7 @@ def submission_form_ready(path: Path) -> bool:
     if any(token in content for token in blocked_tokens):
         return False
     values = {
-        line.split(":", maxsplit=1)[0].strip(): line.split(":", maxsplit=1)[1].strip()
-        for line in content.splitlines()
-        if ":" in line
+        line.split(":", maxsplit=1)[0].strip(): line.split(":", maxsplit=1)[1].strip() for line in content.splitlines() if ":" in line
     }
     required_values = [
         values.get("GitHub repository", ""),

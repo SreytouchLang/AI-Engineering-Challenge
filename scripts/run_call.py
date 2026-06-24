@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import json
 import sys
+from datetime import UTC, datetime
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -37,21 +38,12 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def next_call_id(artifact_store: ArtifactStore) -> str:
-    existing = sorted(artifact_store.metadata_dir.glob("call-*.json"))
-    if not existing:
-        return "call-001"
-    last = existing[-1].stem
-    sequence = int(last.split("-")[1]) + 1
-    return f"call-{sequence:03d}"
-
-
 def main() -> None:
     args = parse_args()
     settings = get_settings()
     scenario = load_scenario(args.scenario)
     artifact_store = ArtifactStore(settings.artifacts_root)
-    call_id = args.call_id or next_call_id(artifact_store)
+    call_id = args.call_id or artifact_store.next_call_id()
 
     if args.dry_run or not settings.enable_real_calls:
         artifact_store.reserve_call_id(call_id)
@@ -93,9 +85,7 @@ def main() -> None:
     )
     print(preflight.render_text())
     if args.confirm_live_call.lower() != "true":
-        raise SystemExit(
-            "Live call preflight displayed. Re-run with --confirm-live-call=true when ready."
-        )
+        raise SystemExit("Live call preflight displayed. Re-run with --confirm-live-call=true when ready.")
     if not preflight.ready:
         raise SystemExit("Live call preflight failed. Resolve the reported problems first.")
     if not sys.stdin.isatty():
@@ -107,12 +97,14 @@ def main() -> None:
     artifact_store.reserve_call_id(call_id)
     metadata = CallMetadata(
         call_id=call_id,
+        provider="twilio",
         scenario_id=scenario.id,
         destination_number=AUTHORIZED_DESTINATION,
         originating_number_masked=mask_phone_number(settings.telephony_from_number),
         start_time=resulting_timestamp(),
         call_status="preflight_passed",
         mode="live",
+        is_real_call=True,
         estimated_cost_usd=settings.expected_cost_per_call_usd,
         model_names={
             "llm": settings.llm_model,
@@ -123,7 +115,7 @@ def main() -> None:
     )
     artifact_store.write_metadata(metadata)
     try:
-        result = TwilioTelephonyClient(settings).create_call(
+        live_result = TwilioTelephonyClient(settings).create_call(
             call_id=call_id,
             scenario_id=scenario.id,
         )
@@ -132,6 +124,7 @@ def main() -> None:
             update={
                 "call_status": "failed_to_start",
                 "termination_reason": "provider_start_failed",
+                "end_time": resulting_timestamp(),
                 "problems": [str(exc)],
             }
         )
@@ -140,9 +133,9 @@ def main() -> None:
 
     updated = metadata.model_copy(
         update={
-            "provider_call_id": result.provider_call_id,
-            "destination_number": result.destination,
-            "call_status": result.status,
+            "provider_call_id": live_result.provider_call_id,
+            "destination_number": live_result.destination,
+            "call_status": live_result.status,
         }
     )
     artifact_store.write_metadata(updated)
@@ -151,8 +144,8 @@ def main() -> None:
             [
                 "CALL RESULT",
                 "",
-                f"Provider call ID: {result.provider_call_id}",
-                f"Status: {result.status}",
+                f"Provider call ID: {live_result.provider_call_id}",
+                f"Status: {live_result.status}",
                 "Duration: pending",
                 "Recording: pending",
                 "Transcript: pending",
@@ -166,9 +159,7 @@ def main() -> None:
     )
 
 
-def resulting_timestamp():
-    from datetime import UTC, datetime
-
+def resulting_timestamp() -> datetime:
     return datetime.now(UTC)
 
 

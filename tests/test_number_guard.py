@@ -8,7 +8,9 @@ from app.safety import (
     AUTHORIZED_DESTINATION,
     RunBudget,
     ensure_real_calls_enabled,
+    format_phone_number_for_display,
     normalize_e164,
+    redact_phone_number,
     scan_paths_for_secrets,
     validate_destination,
 )
@@ -26,6 +28,11 @@ def test_normalize_e164_accepts_common_us_formats() -> None:
 def test_validate_destination_rejects_other_numbers() -> None:
     with pytest.raises(ValueError):
         validate_destination("+15555550123")
+
+
+def test_phone_display_helpers_keep_the_guard_but_format_human_output() -> None:
+    assert format_phone_number_for_display(AUTHORIZED_DESTINATION) == "+1-805-439-8008"
+    assert redact_phone_number("+15555550123") == "+1**********"
 
 
 def test_real_call_flag_is_required() -> None:
@@ -49,4 +56,3 @@ def test_secret_detection_finds_leaked_tokens(tmp_path: Path) -> None:
     secret_file.write_text("OPENAI_API_KEY=sk-testtoken1234567890123456", encoding="utf-8")
     findings = scan_paths_for_secrets([secret_file])
     assert secret_file in findings
-

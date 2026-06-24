@@ -23,6 +23,7 @@ dev = [
   "pytest>=8.2,<9",
   "pytest-asyncio>=0.23,<1",
   "ruff>=0.5,<1",
+  "types-PyYAML>=6.0,<7",
 ]
 
 [build-system]
@@ -46,11 +47,15 @@ asyncio_mode = "auto"
 testpaths = ["tests"]
 
 [tool.ruff]
-line-length = 100
+line-length = 140
 target-version = "py311"
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP"]
+
+[tool.ruff.lint.per-file-ignores]
+"app/review/router.py" = ["E501"]
+"scripts/*.py" = ["E402"]
 
 [tool.mypy]
 python_version = "3.11"

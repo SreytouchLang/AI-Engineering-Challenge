@@ -40,3 +40,14 @@ def test_interruption_controller_clears_pending_marks() -> None:
     controller.clear()
     assert controller.should_clear_for_barge_in() is False
 
+
+def test_turn_manager_uses_shorter_silence_timeout_for_brief_turns() -> None:
+    manager = TurnManager(rms_threshold=200, min_speech_ms=40, end_of_turn_silence_ms=250)
+    speech = make_mulaw_frame(1200)
+    silence = make_mulaw_frame(0, duration_ms=60)
+
+    assert manager.ingest_mulaw_frame(speech, 0).speech_started is True
+    assert manager.ingest_mulaw_frame(speech, 20).completed_turn is None
+    assert manager.ingest_mulaw_frame(silence, 80).completed_turn is None
+    completed = manager.ingest_mulaw_frame(silence, 140).completed_turn
+    assert completed is not None

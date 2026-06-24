@@ -7,8 +7,8 @@ import pytest
 
 from app.analysis.transcript import TranscriptDocument, TranscriptSegment
 from app.analysis.validation import TranscriptValidator
-from app.storage.metadata import CallMetadata
 from app.storage.artifacts import ArtifactStore
+from app.storage.metadata import CallMetadata
 
 
 def test_transcript_requires_monotonic_start_timestamps() -> None:

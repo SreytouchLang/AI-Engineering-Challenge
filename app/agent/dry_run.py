@@ -131,7 +131,10 @@ class OfficeAgentSimulator:
         del state
         sequence = [
             "Athena scheduling, how can I help today?",
-            "Let me explain all of our appointment categories, provider templates, intake rules, and check-in expectations before we choose a slot.",
+            (
+                "Let me explain all of our appointment categories, provider templates, "
+                "intake rules, and check-in expectations before we choose a slot."
+            ),
             "Understood. What time on Tuesday works best for you?",
             "You're confirmed for Tuesday at 9:30 AM. Anything else I can help with?",
         ]
@@ -150,7 +153,11 @@ class OfficeAgentSimulator:
         else:
             sequence = [
                 f"Thanks for clarifying. I can update that to {self.scenario.background.details['changed_hold']}.",
-                f"Just confirming, the visit is now {self.scenario.background.details['changed_reason']} on {self.scenario.background.details['changed_hold']}.",
+                (
+                    "Just confirming, the visit is now "
+                    f"{self.scenario.background.details['changed_reason']} on "
+                    f"{self.scenario.background.details['changed_hold']}."
+                ),
             ]
             index = self.step - 4
         return sequence[index] if 0 <= index < len(sequence) else None
@@ -286,6 +293,7 @@ class DryRunConversationRunner:
 
         metadata = CallMetadata(
             call_id=call_id,
+            provider="simulator",
             scenario_id=self.scenario.id,
             destination_number=AUTHORIZED_DESTINATION,
             originating_number_masked=mask_phone_number(self.settings.telephony_from_number),
@@ -294,6 +302,11 @@ class DryRunConversationRunner:
             duration_seconds=current_second,
             call_status="completed",
             mode="dry_run",
+            is_real_call=False,
+            transcript_generation_status="completed",
+            transcript_generated_at=started_at,
+            transcript_source="dry_run_simulation",
+            transcript_strategy="dry_run_scripted_turns",
             transcript_path=f"artifacts/transcripts/{call_id}.txt",
             estimated_cost_usd=0.0,
             model_names={"llm": self.settings.llm_model},

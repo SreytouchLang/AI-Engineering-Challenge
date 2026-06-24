@@ -14,7 +14,6 @@ from app.submission import (
     has_required_recording,
     is_provider_confirmed_live_call,
     list_call_bundles,
-    manual_review_completed,
     selected_for_submission,
     transcript_is_valid,
 )
@@ -46,11 +45,7 @@ def _rank_score(bundle) -> float:
 def main() -> None:
     settings = get_settings()
     artifact_store = ArtifactStore(settings.artifacts_root)
-    bundles = [
-        bundle
-        for bundle in list_call_bundles(artifact_store)
-        if is_provider_confirmed_live_call(bundle.metadata)
-    ]
+    bundles = [bundle for bundle in list_call_bundles(artifact_store) if is_provider_confirmed_live_call(bundle.metadata)]
     ranked = sorted(bundles, key=_rank_score, reverse=True)
 
     lines = [
@@ -88,6 +83,7 @@ def main() -> None:
 
     output_path = settings.project_root / "FINAL_CALL_SELECTION.md"
     output_path.write_text("\n".join(lines).rstrip() + "\n", encoding="utf-8")
+    print(f"Wrote {output_path.name} with {len(ranked)} provider-confirmed calls ranked and {len(approved)} calls approved for submission.")
 
     if len(approved) < 10:
         raise SystemExit(1)

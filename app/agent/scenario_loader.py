@@ -104,4 +104,3 @@ def load_scenario(path: str | Path) -> Scenario:
 def load_scenarios(directory: str | Path) -> list[Scenario]:
     base = Path(directory)
     return [load_scenario(path) for path in sorted(base.glob("*.yaml"))]
-

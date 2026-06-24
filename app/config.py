@@ -83,9 +83,7 @@ class AppSettings(BaseSettings):
     def _validate_authorized_destination(cls, value: str) -> str:
         normalized = normalize_e164(value)
         if normalized != AUTHORIZED_DESTINATION:
-            raise ValueError(
-                "AUTHORIZED_DESTINATION must remain locked to +18054398008."
-            )
+            raise ValueError("AUTHORIZED_DESTINATION must remain locked to +18054398008.")
         return normalized
 
     @field_validator("telephony_from_number")
@@ -95,21 +93,19 @@ class AppSettings(BaseSettings):
             return None
         return normalize_e164(value)
 
-    @computed_field  # type: ignore[misc]
+    @computed_field  # type: ignore[prop-decorator]
     @property
     def project_root(self) -> Path:
         return Path(__file__).resolve().parent.parent
 
-    @computed_field  # type: ignore[misc]
+    @computed_field  # type: ignore[prop-decorator]
     @property
     def artifacts_root(self) -> Path:
         return self.project_root / "artifacts"
 
     def require_public_base_url(self) -> str:
         if self.public_base_url is None:
-            raise RuntimeError(
-                "PUBLIC_BASE_URL is required for webhook-based live call execution."
-            )
+            raise RuntimeError("PUBLIC_BASE_URL is required for webhook-based live call execution.")
         return str(self.public_base_url).rstrip("/")
 
     def media_stream_url(self) -> str:

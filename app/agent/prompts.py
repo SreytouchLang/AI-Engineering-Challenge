@@ -3,7 +3,6 @@ from __future__ import annotations
 from app.agent.scenario_loader import Scenario
 from app.agent.state import ConversationState
 
-
 PATIENT_SYSTEM_PROMPT = (
     "You are simulating a realistic patient calling a healthcare office. "
     "Stay fully consistent with the assigned fictional scenario. "
@@ -32,4 +31,3 @@ def build_patient_instructions(scenario: Scenario, state: ConversationState) -> 
         f"Follow-up questions: {scenario.follow_up_questions}\n"
         f"Current state: {state.compact_summary()}\n"
     )
-

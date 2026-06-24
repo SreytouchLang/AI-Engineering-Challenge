@@ -9,7 +9,7 @@ from app.analysis.transcript import TranscriptDocument
 from app.safety import find_secret_like_values
 from app.storage.artifacts import ArtifactPaths
 from app.storage.metadata import CallMetadata
-from app.voice.audio import wav_duration_seconds
+from app.voice.audio import audio_duration_seconds
 
 
 class TranscriptValidationIssue(BaseModel):
@@ -80,14 +80,9 @@ class TranscriptValidator:
             "PATIENT",
             "AGENT",
         } <= {segment.speaker for segment in segments}
-        monotonic_timestamps = all(
-            later.start_timestamp >= earlier.start_timestamp
-            for earlier, later in zip(segments, segments[1:])
-        )
+        monotonic_timestamps = all(later.start_timestamp >= earlier.start_timestamp for earlier, later in zip(segments, segments[1:]))
         average_confidence = self._average_confidence(segments)
-        minimum_confidence = min(
-            (segment.confidence if segment.confidence is not None else 1.0) for segment in segments
-        )
+        minimum_confidence = min((segment.confidence if segment.confidence is not None else 1.0) for segment in segments)
         duration_match, audio_duration_seconds = self._duration_match(
             transcript=transcript,
             metadata=metadata,
@@ -123,8 +118,7 @@ class TranscriptValidator:
                     code="low_confidence",
                     severity="high",
                     message=(
-                        f"Average transcript confidence {average_confidence:.2f} is below "
-                        f"the threshold of {self.confidence_threshold:.2f}."
+                        f"Average transcript confidence {average_confidence:.2f} is below the threshold of {self.confidence_threshold:.2f}."
                     ),
                 )
             )
@@ -228,10 +222,7 @@ class TranscriptValidator:
         )
 
     def _average_confidence(self, segments) -> float:
-        confidences = [
-            segment.confidence if segment.confidence is not None else 1.0
-            for segment in segments
-        ]
+        confidences = [segment.confidence if segment.confidence is not None else 1.0 for segment in segments]
         return sum(confidences) / max(1, len(confidences))
 
     def _duration_match(
@@ -251,18 +242,15 @@ class TranscriptValidator:
         if paths.patient_recording.exists():
             candidate_paths.append(paths.patient_recording)
 
-        audio_duration_seconds = transcript.duration_seconds
+        detected_audio_duration_seconds = transcript.duration_seconds
         for candidate in candidate_paths:
             if not candidate.exists():
                 continue
-            if candidate.suffix.lower() == ".wav":
-                audio_duration_seconds = wav_duration_seconds(str(candidate))
-            else:
-                audio_duration_seconds = transcript.duration_seconds
+            detected_audio_duration_seconds = audio_duration_seconds(candidate)
             break
 
-        duration_delta = abs(audio_duration_seconds - transcript.duration_seconds)
-        return duration_delta <= self.duration_tolerance_seconds, audio_duration_seconds
+        duration_delta = abs(detected_audio_duration_seconds - transcript.duration_seconds)
+        return duration_delta <= self.duration_tolerance_seconds, detected_audio_duration_seconds
 
     def _gap_count(self, segments) -> int:
         gap_count = 0

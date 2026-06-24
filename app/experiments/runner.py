@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
+from typing import TypedDict
 
 import yaml
 from pydantic import BaseModel, ConfigDict, Field
@@ -11,11 +13,39 @@ from app.agent.dry_run import DryRunConversationRunner
 from app.agent.scenario_loader import Scenario, load_scenarios
 from app.analysis.evaluator import ConversationEvaluator
 from app.analysis.quality import VoiceQualityAnalyzer
+from app.analysis.transcript import TranscriptDocument
 from app.analysis.validation import TranscriptValidator
 from app.config import AppSettings
 from app.storage.artifacts import ArtifactStore
 from app.storage.metadata import CallMetadata
 from app.storage.recording_builder import build_dry_run_recordings
+
+
+class CallSummary(TypedDict):
+    call_id: str
+    scenario_id: str
+    quality_score: int
+    validation_passed: bool
+    issue_count: int
+    average_patient_words: float
+
+
+class VariantSummaryDict(TypedDict):
+    variant_id: str
+    average_quality_score: float
+    average_patient_words: float
+    validation_pass_rate: float
+    issue_count: int
+    calls: list[CallSummary]
+
+
+class ExperimentResults(TypedDict):
+    experiment_id: str
+    scenarios: list[str]
+    baseline: VariantSummaryDict
+    candidate: VariantSummaryDict
+    winner: str
+    note: str
 
 
 class ExperimentVariant(BaseModel):
@@ -43,29 +73,22 @@ class VariantSummary:
     average_patient_words: float
     validation_pass_rate: float
     issue_count: int
-    calls: list[dict[str, object]]
+    calls: list[CallSummary]
 
 
 class ExperimentRunner:
     def __init__(self, settings: AppSettings) -> None:
         self.settings = settings
-        self.scenario_index = {
-            scenario.id: scenario for scenario in load_scenarios(settings.project_root / "scenarios")
-        }
+        self.scenario_index = {scenario.id: scenario for scenario in load_scenarios(settings.project_root / "scenarios")}
 
     def load_config(self, path: Path) -> ExperimentConfig:
         raw = yaml.safe_load(path.read_text(encoding="utf-8"))
         return ExperimentConfig.model_validate(raw)
 
-    def run(self, config: ExperimentConfig) -> dict[str, object]:
+    def run(self, config: ExperimentConfig) -> ExperimentResults:
         variants = [config.baseline, config.candidate]
-        temp_store = ArtifactStore(
-            self.settings.project_root / "tmp" / "experiments" / config.id / "artifacts"
-        )
-        summaries = [
-            self._run_variant(config, variant, temp_store)
-            for variant in variants
-        ]
+        temp_store = ArtifactStore(self.settings.project_root / "tmp" / "experiments" / config.id / "artifacts")
+        summaries = [self._run_variant(config, variant, temp_store) for variant in variants]
         winner = max(summaries, key=lambda summary: summary.average_quality_score)
         return {
             "experiment_id": config.id,
@@ -74,12 +97,11 @@ class ExperimentRunner:
             "candidate": _summary_to_dict(summaries[1]),
             "winner": winner.variant_id,
             "note": (
-                "Dry-run comparison only. Use this as a pre-live tuning signal, "
-                "not as substitute evidence for the required real calls."
+                "Dry-run comparison only. Use this as a pre-live tuning signal, not as substitute evidence for the required real calls."
             ),
         }
 
-    def write_results(self, config: ExperimentConfig, results: dict[str, object]) -> tuple[Path, Path]:
+    def write_results(self, config: ExperimentConfig, results: ExperimentResults) -> tuple[Path, Path]:
         output_dir = self.settings.project_root / "experiments" / config.id
         output_dir.mkdir(parents=True, exist_ok=True)
         json_path = output_dir / "results.json"
@@ -94,7 +116,7 @@ class ExperimentRunner:
         variant: ExperimentVariant,
         temp_store: ArtifactStore,
     ) -> VariantSummary:
-        calls: list[dict[str, object]] = []
+        calls: list[CallSummary] = []
         quality_scores: list[int] = []
         patient_word_counts: list[float] = []
         validation_passes = 0
@@ -119,13 +141,7 @@ class ExperimentRunner:
             evaluation = ConversationEvaluator().evaluate(scenario, transcript)
             quality_scores.append(quality.overall_score)
             patient_word_counts.append(
-                _average(
-                    [
-                        len(segment.text.split())
-                        for segment in transcript.segments
-                        if segment.speaker == "PATIENT"
-                    ]
-                )
+                _average([len(segment.text.split()) for segment in transcript.segments if segment.speaker == "PATIENT"])
             )
             validation_passes += int(validation.passed)
             issue_count += len(evaluation.issues)
@@ -156,7 +172,7 @@ class ExperimentRunner:
         scenario: Scenario,
         temp_store: ArtifactStore,
         response_style: str,
-    ) -> tuple:
+    ) -> tuple[TranscriptDocument, CallMetadata]:
         result = DryRunConversationRunner(
             self.settings,
             scenario,
@@ -181,7 +197,7 @@ class ExperimentRunner:
         return result.transcript, metadata
 
 
-def _summary_to_dict(summary: VariantSummary) -> dict[str, object]:
+def _summary_to_dict(summary: VariantSummary) -> VariantSummaryDict:
     return {
         "variant_id": summary.variant_id,
         "average_quality_score": summary.average_quality_score,
@@ -192,7 +208,7 @@ def _summary_to_dict(summary: VariantSummary) -> dict[str, object]:
     }
 
 
-def _render_results_markdown(results: dict[str, object]) -> str:
+def _render_results_markdown(results: ExperimentResults) -> str:
     baseline = results["baseline"]
     candidate = results["candidate"]
     return (
@@ -209,7 +225,7 @@ def _render_results_markdown(results: dict[str, object]) -> str:
     )
 
 
-def _average(values: list[float | int]) -> float:
+def _average(values: Sequence[float | int]) -> float:
     if not values:
         return 0.0
     return sum(float(value) for value in values) / len(values)

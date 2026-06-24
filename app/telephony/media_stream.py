@@ -8,7 +8,7 @@ from pathlib import Path
 
 from fastapi import WebSocket
 
-from app.agent.patient_agent import OpenAITextGenerationClient, PatientAgent, PatientReply
+from app.agent.patient_agent import OpenAITextGenerationClient, PatientAgent
 from app.agent.scenario_loader import Scenario, load_scenarios
 from app.agent.state import ConversationState, ConversationTurn, LatencySnapshot
 from app.analysis.transcript import TranscriptDocument, TranscriptSegment
@@ -38,7 +38,7 @@ class MediaStreamSessionRegistry:
         self.sessions: dict[str, MediaStreamSession] = {}
         self._scenario_index = self._load_scenario_index(settings.project_root / "scenarios")
 
-    def get_or_create(self, call_id: str, scenario_id: str) -> "MediaStreamSession":
+    def get_or_create(self, call_id: str, scenario_id: str) -> MediaStreamSession:
         if call_id not in self.sessions:
             scenario = self._scenario_index[scenario_id]
             self.sessions[call_id] = MediaStreamSession(
@@ -90,11 +90,7 @@ class MediaStreamSession:
         self.playback_task: asyncio.Task[None] | None = None
         self.pending_interrupt_reply = False
         self.last_interrupt_started_ms: int | None = None
-        self.llm_client = (
-            OpenAITextGenerationClient(settings.llm_api_key, settings.llm_model)
-            if settings.llm_api_key
-            else None
-        )
+        self.llm_client = OpenAITextGenerationClient(settings.llm_api_key, settings.llm_model) if settings.llm_api_key else None
         if not settings.stt_api_key or not settings.tts_api_key:
             raise RuntimeError("STT_API_KEY and TTS_API_KEY are required for live calls.")
         self.patient_agent = PatientAgent(
@@ -130,9 +126,7 @@ class MediaStreamSession:
             media = payload["media"]
             timestamp_ms = int(media.get("timestamp", 0))
             decoded_mulaw = base64.b64decode(media["payload"])
-            self.agent_audio_segments.append(
-                TimedPcmSegment(start_ms=timestamp_ms, pcm_bytes=mulaw_to_pcm16(decoded_mulaw))
-            )
+            self.agent_audio_segments.append(TimedPcmSegment(start_ms=timestamp_ms, pcm_bytes=mulaw_to_pcm16(decoded_mulaw)))
             event = self.turn_manager.ingest_mulaw_frame(decoded_mulaw, timestamp_ms)
 
             if event.speech_started and self._playback_is_active():
@@ -141,14 +135,8 @@ class MediaStreamSession:
                 self.interruption.clear()
                 await self._cancel_playback()
 
-            unsolicited_interrupt = self.patient_agent.maybe_interrupt_ongoing_agent_turn(
-                event.speech_ongoing_ms
-            )
-            if (
-                unsolicited_interrupt is not None
-                and not self._playback_is_active()
-                and not self.pending_interrupt_reply
-            ):
+            unsolicited_interrupt = self.patient_agent.maybe_interrupt_ongoing_agent_turn(event.speech_ongoing_ms)
+            if unsolicited_interrupt is not None and not self._playback_is_active() and not self.pending_interrupt_reply:
                 self.pending_interrupt_reply = True
                 self.last_interrupt_started_ms = timestamp_ms
                 overlap_ms = min(900, event.speech_ongoing_ms)
@@ -254,19 +242,14 @@ class MediaStreamSession:
     ) -> None:
         synthesis = self.tts_client.synthesize(
             text,
-            instructions=(
-                f"Speak as a realistic patient. Tone: {self.scenario.patient.tone}. "
-                "Keep the delivery concise and natural."
-            ),
+            instructions=(f"Speak as a realistic patient. Tone: {self.scenario.patient.tone}. Keep the delivery concise and natural."),
         )
         if self.stream_sid is None:
             raise RuntimeError("Cannot send audio before the Twilio stream is ready.")
 
         patient_pcm = wav_bytes_to_pcm16(synthesis.wav_bytes)
         audio_index = len(self.patient_audio_segments)
-        self.patient_audio_segments.append(
-            TimedPcmSegment(start_ms=int(timestamp_start * 1000), pcm_bytes=patient_pcm)
-        )
+        self.patient_audio_segments.append(TimedPcmSegment(start_ms=int(timestamp_start * 1000), pcm_bytes=patient_pcm))
 
         total_response_latency_ms = (llm_latency_ms or 0.0) + synthesis.latency_ms
         self._log_metric(
@@ -336,15 +319,11 @@ class MediaStreamSession:
         try:
             for chunk in chunk_mulaw_audio(mulaw_bytes):
                 payload = base64.b64encode(chunk).decode("ascii")
-                await websocket.send_json(
-                    {"event": "media", "streamSid": self.stream_sid, "media": {"payload": payload}}
-                )
+                await websocket.send_json({"event": "media", "streamSid": self.stream_sid, "media": {"payload": payload}})
                 sent_bytes.extend(chunk)
                 await asyncio.sleep(max(0.02, len(chunk) / 8000))
 
-            await websocket.send_json(
-                {"event": "mark", "streamSid": self.stream_sid, "mark": {"name": mark_name}}
-            )
+            await websocket.send_json({"event": "mark", "streamSid": self.stream_sid, "mark": {"name": mark_name}})
         except asyncio.CancelledError:
             actual_duration_ms = duration_ms_from_mulaw(bytes(sent_bytes))
             self._truncate_patient_segment(
@@ -473,45 +452,44 @@ class MediaStreamSession:
 
         existing_metadata = None
         if paths.metadata_json.exists():
-            existing_metadata = CallMetadata.model_validate_json(
-                paths.metadata_json.read_text(encoding="utf-8")
-            )
+            existing_metadata = CallMetadata.model_validate_json(paths.metadata_json.read_text(encoding="utf-8"))
 
         metadata = CallMetadata(
             call_id=self.call_id,
-            provider_call_id=(
-                existing_metadata.provider_call_id if existing_metadata else None
-            ),
-            provider_recording_id=(
-                existing_metadata.provider_recording_id if existing_metadata else None
-            ),
-            provider_recording_status=(
-                existing_metadata.provider_recording_status if existing_metadata else None
-            ),
-            provider_recording_channels=(
-                existing_metadata.provider_recording_channels if existing_metadata else None
-            ),
-            provider_recording_source=(
-                existing_metadata.provider_recording_source if existing_metadata else None
-            ),
-            provider_recording_url=(
-                existing_metadata.provider_recording_url if existing_metadata else None
-            ),
+            provider=(existing_metadata.provider if existing_metadata else "twilio"),
+            provider_call_id=(existing_metadata.provider_call_id if existing_metadata else None),
+            provider_recording_id=(existing_metadata.provider_recording_id if existing_metadata else None),
+            provider_recording_status=(existing_metadata.provider_recording_status if existing_metadata else None),
+            provider_recording_channels=(existing_metadata.provider_recording_channels if existing_metadata else None),
+            provider_recording_source=(existing_metadata.provider_recording_source if existing_metadata else None),
+            provider_recording_url=(existing_metadata.provider_recording_url if existing_metadata else None),
+            provider_recording_duration_seconds=(existing_metadata.provider_recording_duration_seconds if existing_metadata else None),
             scenario_id=self.scenario.id,
             destination_number=self.settings.authorized_destination,
-            originating_number_masked=(
-                existing_metadata.originating_number_masked if existing_metadata else None
-            ),
+            originating_number_masked=(existing_metadata.originating_number_masked if existing_metadata else None),
             start_time=existing_metadata.start_time if existing_metadata else self.started_at,
             end_time=datetime.now(UTC),
             duration_seconds=duration_seconds,
             call_status="completed",
             mode="live",
+            is_real_call=True,
             recording_path=f"artifacts/recordings/{paths.mixed_recording.name}",
             patient_recording_path=f"artifacts/recordings/{paths.patient_recording.name}",
             agent_recording_path=f"artifacts/recordings/{paths.agent_recording.name}",
             mixed_recording_path=f"artifacts/recordings/{paths.mixed_recording.name}",
+            recording_download_status=(existing_metadata.recording_download_status if existing_metadata else "pending"),
+            recording_download_attempts=(existing_metadata.recording_download_attempts if existing_metadata else 0),
+            recording_downloaded_at=(existing_metadata.recording_downloaded_at if existing_metadata else None),
+            recording_checksum_sha256=(existing_metadata.recording_checksum_sha256 if existing_metadata else None),
+            recording_validation_path=(existing_metadata.recording_validation_path if existing_metadata else None),
+            recording_validation_status=(existing_metadata.recording_validation_status if existing_metadata else "pending"),
             transcript_path=f"artifacts/transcripts/{self.call_id}.txt",
+            transcript_generation_status="completed",
+            transcript_generated_at=datetime.now(UTC),
+            transcript_source="live_media_stream",
+            transcript_strategy="channel_aware_live_stream",
+            transcript_validation_path=(existing_metadata.transcript_validation_path if existing_metadata else None),
+            transcript_validation_status=(existing_metadata.transcript_validation_status if existing_metadata else "pending"),
             estimated_cost_usd=self.settings.expected_cost_per_call_usd,
             model_names={
                 "llm": self.settings.llm_model,
@@ -522,6 +500,10 @@ class MediaStreamSession:
             average_transcript_confidence=self._average_confidence(),
             termination_reason=self.state.termination_reason,
             analysis_completion_status="pending",
+            quality_report_path=existing_metadata.quality_report_path if existing_metadata else None,
+            quality_score=existing_metadata.quality_score if existing_metadata else None,
+            submission_ready=existing_metadata.submission_ready if existing_metadata else False,
+            reviewer_notes=existing_metadata.reviewer_notes if existing_metadata else None,
             problems=existing_metadata.problems if existing_metadata else [],
         )
         self.artifact_store.write_transcript(transcript)
@@ -538,11 +520,7 @@ class MediaStreamSession:
         return sum(values) / len(values)
 
     def _average_confidence(self) -> float | None:
-        confidences = [
-            segment.confidence
-            for segment in self.transcript_segments
-            if segment.confidence is not None
-        ]
+        confidences = [segment.confidence for segment in self.transcript_segments if segment.confidence is not None]
         if not confidences:
             return None
         return sum(confidences) / len(confidences)

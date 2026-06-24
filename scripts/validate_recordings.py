@@ -16,22 +16,27 @@ from app.submission import is_provider_confirmed_live_call, list_call_bundles
 def main() -> None:
     settings = get_settings()
     artifact_store = ArtifactStore(settings.artifacts_root)
-    bundles = [
-        bundle
-        for bundle in list_call_bundles(artifact_store)
-        if is_provider_confirmed_live_call(bundle.metadata)
-    ]
-    validator = RecordingValidator(
-        duration_tolerance_seconds=settings.duration_mismatch_tolerance_seconds
-    )
-    reports = [
-        validator.validate(
+    bundles = [bundle for bundle in list_call_bundles(artifact_store) if is_provider_confirmed_live_call(bundle.metadata)]
+    validator = RecordingValidator(duration_tolerance_seconds=settings.duration_mismatch_tolerance_seconds)
+    reports = []
+    for bundle in bundles:
+        report = validator.validate(
             metadata=bundle.metadata,
             paths=bundle.paths,
             transcript=bundle.transcript,
         )
-        for bundle in bundles
-    ]
+        reports.append(report)
+        validation_json, validation_md = artifact_store.recording_validation_paths(bundle.call_id)
+        artifact_store.write_model_json(validation_json, report)
+        artifact_store.write_markdown(validation_md, report.render_markdown())
+        updated = bundle.metadata.model_copy(
+            update={
+                "recording_validation_path": f"artifacts/validation/{validation_json.name}",
+                "recording_validation_status": "passed" if report.passed else "failed",
+                "recording_checksum_sha256": str(report.metrics["checksum_sha256"]),
+            }
+        )
+        artifact_store.write_metadata(updated)
 
     output_path = settings.project_root / "RECORDING_VALIDATION_REPORT.md"
     lines = ["# Recording Validation Report", ""]

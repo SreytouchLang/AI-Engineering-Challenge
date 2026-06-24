@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import shutil
 import subprocess
 from dataclasses import dataclass
 from pathlib import Path
@@ -66,9 +67,27 @@ class ArtifactStore:
             validation_md=self.validation_dir / f"{call_id}-validation.md",
         )
 
+    def next_call_id(self) -> str:
+        existing = sorted(self.metadata_dir.glob("call-*.json"))
+        if not existing:
+            return "call-001"
+        last = existing[-1].stem
+        sequence = int(last.split("-")[1]) + 1
+        return f"call-{sequence:03d}"
+
+    def original_recording_path(self, call_id: str, suffix: str) -> Path:
+        extension = suffix.removeprefix(".")
+        return self.recordings_dir / f"{call_id}-provider-original.{extension}"
+
+    def recording_validation_paths(self, call_id: str) -> tuple[Path, Path]:
+        return (
+            self.validation_dir / f"{call_id}-recording-validation.json",
+            self.validation_dir / f"{call_id}-recording-validation.md",
+        )
+
     def reserve_call_id(self, call_id: str) -> None:
         paths = self.paths_for(call_id)
-        candidates = (
+        candidates = [
             paths.recording,
             paths.patient_recording,
             paths.agent_recording,
@@ -81,7 +100,8 @@ class ArtifactStore:
             paths.quality_md,
             paths.validation_json,
             paths.validation_md,
-        )
+        ]
+        candidates.extend(self.recordings_dir.glob(f"{call_id}-provider-original.*"))
         collisions = [path for path in candidates if path.exists()]
         if collisions:
             joined = ", ".join(path.name for path in collisions)
@@ -137,6 +157,10 @@ class ArtifactStore:
             str(destination),
         ]
         subprocess.run(command, check=True, capture_output=True, text=True)
+        return destination
+
+    def copy_audio(self, source: Path, destination: Path) -> Path:
+        shutil.copyfile(source, destination)
         return destination
 
     def write_json(self, path: Path, payload: dict) -> Path:

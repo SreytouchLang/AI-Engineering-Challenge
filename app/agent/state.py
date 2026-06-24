@@ -95,9 +95,7 @@ class ConversationState(BaseModel):
 
     def ensure_identity_consistency(self, name: str) -> None:
         if name != self.patient_name:
-            raise ValueError(
-                f"Patient identity changed from {self.patient_name!r} to {name!r}."
-            )
+            raise ValueError(f"Patient identity changed from {self.patient_name!r} to {name!r}.")
 
     def recent_context(self, limit: int = 6) -> list[ConversationTurn]:
         return self.conversation[-limit:]
@@ -110,9 +108,7 @@ class ConversationState(BaseModel):
         self.termination_reason = reason
 
     def compact_summary(self) -> str:
-        recent_turns = [
-            f"{turn.speaker}: {turn.text}" for turn in self.recent_context(limit=4)
-        ]
+        recent_turns = [f"{turn.speaker}: {turn.text}" for turn in self.recent_context(limit=4)]
         return (
             f"goal={self.current_goal}; "
             f"disclosed={self.facts_disclosed}; "

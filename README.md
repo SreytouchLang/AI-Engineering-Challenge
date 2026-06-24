@@ -131,6 +131,9 @@ make suite
 ## Test Instructions
 
 ```bash
+make format-check
+make lint
+make typecheck
 make test
 ```
 
@@ -140,6 +143,18 @@ Analyze a completed call:
 
 ```bash
 python scripts/analyze_call.py --call-id call-001
+```
+
+Fetch and validate the provider recording for a real call:
+
+```bash
+python scripts/fetch_recording.py --call-id call-001
+```
+
+Create or refresh the two-speaker transcript for a real call:
+
+```bash
+python scripts/transcribe_call.py --call-id call-001
 ```
 
 Review issues and build the Markdown bug report:
@@ -192,6 +207,11 @@ Validate committed live-call transcripts:
 python scripts/validate_transcripts.py
 ```
 
+Review the current code-level live-call audit before the first smoke call:
+
+- [LIVE_CALL_READINESS.md](LIVE_CALL_READINESS.md)
+- [FIRST_REAL_CALL_PLAN.md](FIRST_REAL_CALL_PLAN.md)
+
 Rank currently selected calls:
 
 ```bash
@@ -208,7 +228,7 @@ make submission-check
 
 ## Cost Controls
 
-- The destination number is locked to `+18054398008`
+- The destination number is locked to `+1-805-439-8008`
 - Real calls require `ENABLE_REAL_CALLS=true`
 - Real calls also require `--confirm-live-call=true`
 - `MAX_CALL_DURATION_SECONDS` caps a single call

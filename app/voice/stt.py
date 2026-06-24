@@ -16,8 +16,7 @@ class TranscriptionResult:
 
 
 class SpeechToTextClient(Protocol):
-    def transcribe(self, wav_bytes: bytes) -> TranscriptionResult:
-        ...
+    def transcribe(self, wav_bytes: bytes) -> TranscriptionResult: ...
 
 
 class OpenAITranscriptionClient:
@@ -51,4 +50,3 @@ class StaticSpeechToTextClient:
             text = self.scripted_results[self.index]
         self.index += 1
         return TranscriptionResult(text=text, confidence=1.0, latency_ms=0.0)
-

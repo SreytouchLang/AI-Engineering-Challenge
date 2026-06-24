@@ -2,8 +2,11 @@ from __future__ import annotations
 
 import audioop
 import io
+import json
+import subprocess
 import wave
 from dataclasses import dataclass
+from pathlib import Path
 
 
 @dataclass(frozen=True, slots=True)
@@ -66,10 +69,7 @@ def wav_to_mulaw(wav_bytes: bytes) -> bytes:
 
 
 def chunk_mulaw_audio(mulaw_bytes: bytes, chunk_size: int = 160) -> list[bytes]:
-    return [
-        mulaw_bytes[index : index + chunk_size]
-        for index in range(0, len(mulaw_bytes), chunk_size)
-    ]
+    return [mulaw_bytes[index : index + chunk_size] for index in range(0, len(mulaw_bytes), chunk_size)]
 
 
 def duration_ms_from_mulaw(mulaw_bytes: bytes) -> int:
@@ -95,10 +95,7 @@ def render_timed_pcm_track(
     if not segments and minimum_duration_ms <= 0:
         return b""
 
-    end_offsets = [
-        segment.start_ms + int((len(segment.pcm_bytes) / 2 / 8000) * 1000)
-        for segment in segments
-    ]
+    end_offsets = [segment.start_ms + int((len(segment.pcm_bytes) / 2 / 8000) * 1000) for segment in segments]
     total_duration_ms = max(end_offsets + [minimum_duration_ms], default=minimum_duration_ms)
     track = bytearray(silence_pcm16(total_duration_ms))
 
@@ -131,3 +128,27 @@ def mix_pcm16_tracks(track_a: bytes, track_b: bytes) -> bytes:
 def wav_duration_seconds(path: str) -> float:
     with wave.open(path, "rb") as wav_file:
         return wav_file.getnframes() / float(wav_file.getframerate())
+
+
+def audio_duration_seconds(path: str | Path) -> float:
+    audio_path = Path(path)
+    if audio_path.suffix.lower() == ".wav":
+        return wav_duration_seconds(str(audio_path))
+
+    result = subprocess.run(
+        [
+            "ffprobe",
+            "-v",
+            "error",
+            "-show_entries",
+            "format=duration",
+            "-of",
+            "json",
+            str(audio_path),
+        ],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    payload = json.loads(result.stdout or "{}")
+    return float(payload.get("format", {}).get("duration", 0.0))

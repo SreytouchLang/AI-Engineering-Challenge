@@ -16,13 +16,12 @@ from app.submission import (
     artifact_link_targets_exist,
     list_call_bundles,
     manual_review_completed,
-    public_repository_audit_verified,
     public_repository_accessible,
+    public_repository_audit_verified,
     real_call_is_complete,
     selected_for_submission,
     submission_form_ready,
 )
-
 
 REPO_URL = "https://github.com/SreytouchLang/AI-Engineering-Challenge"
 
@@ -51,8 +50,10 @@ def main() -> None:
     if not repo_ok:
         repo_ok = public_repository_audit_verified(settings.project_root, REPO_URL)
     real_calls_ok = len([bundle for bundle in bundles if real_call_is_complete(bundle)]) >= 10
-    recordings_ok = bool(selected_calls) and all(bundle.paths.mixed_recording.exists() or bundle.paths.recording.exists() for bundle in selected_calls)
-    transcripts_ok = bool(selected_calls) and all(bundle.paths.transcript_json.exists() for bundle in selected_calls)
+    recordings_ok = bool(selected_calls) and all(bundle.metadata.recording_validation_status == "passed" for bundle in selected_calls)
+    transcripts_ok = bool(selected_calls) and all(
+        bundle.metadata.transcript_validation_status == "passed" and bundle.paths.transcript_json.exists() for bundle in selected_calls
+    )
     approved_bugs_ok = any(approved_live_issues(bundle) for bundle in selected_calls)
     manual_review_ok = bool(selected_calls) and all(manual_review_completed(bundle) for bundle in selected_calls)
 
@@ -65,7 +66,7 @@ def main() -> None:
     tests_ok = _run([sys.executable, "-m", "pytest", "-q"])
     format_ok = _run([sys.executable, "-m", "ruff", "format", "--check", "."]) if _module_available("ruff") else False
     lint_ok = _run([sys.executable, "-m", "ruff", "check", "."]) if _module_available("ruff") else False
-    type_ok = _run([sys.executable, "-m", "mypy", "app", "scripts"]) if _module_available("mypy") else False
+    type_ok = _run([sys.executable, "-m", "mypy", "app", "scripts", "tests"]) if _module_available("mypy") else False
     scenario_ok = _run([sys.executable, "scripts/validate_scenarios.py"])
     recording_ok = _run([sys.executable, "scripts/validate_recordings.py"])
     transcript_ok = _run([sys.executable, "scripts/validate_transcripts.py"])
@@ -119,25 +120,25 @@ def main() -> None:
     )
 
     rows = [
-        ("Public repository", repo_ok),
-        ("Real calls >= 10", real_calls_ok),
-        ("Recording for every selected call", recordings_ok),
-        ("Two-speaker transcript for every selected call", transcripts_ok),
-        ("Approved live-call bugs", approved_bugs_ok),
-        ("Manual recording review", manual_review_ok),
-        ("Main Loom link", main_loom_ok),
-        ("AI debugging Loom link", ai_loom_ok),
-        ("Submission form ready", submission_form_ok),
-        ("Tests", tests_ok),
         ("Formatting", format_ok),
         ("Linting", lint_ok),
         ("Type checking", type_ok),
+        ("Tests", tests_ok),
+        ("Public repository", repo_ok),
+        ("Real calls >= 10", real_calls_ok),
+        ("Recordings complete", recordings_ok),
+        ("Transcripts complete", transcripts_ok),
+        ("Manual review complete", manual_review_ok),
+        ("Approved bugs", approved_bugs_ok),
+        ("Main Loom", main_loom_ok),
+        ("AI debugging Loom", ai_loom_ok),
+        ("Submission form", submission_form_ok),
+        ("Security scan", secrets_ok),
         ("Scenario validation", scenario_ok),
         ("Recording validation", recording_ok),
         ("Transcript validation", transcript_ok),
         ("Metadata validation", metadata_ok),
         ("Artifact-link validation", links_ok),
-        ("Secret scan", secrets_ok),
         ("Bug-evidence validation", bug_evidence_ok),
     ]
     print("FINAL SUBMISSION CHECK\n")
