@@ -1,0 +1,17 @@
+.DS_Store
+.env
+.env.local
+.pytest_cache/
+.venv/
+__pycache__/
+*.egg-info/
+*.pyc
+artifacts/call_metadata/*.json
+artifacts/evaluations/*.json
+artifacts/recordings/*.mp3
+artifacts/recordings/*.ogg
+artifacts/recordings/*.wav
+artifacts/transcripts/*.json
+artifacts/transcripts/*.txt
+tmp/
+

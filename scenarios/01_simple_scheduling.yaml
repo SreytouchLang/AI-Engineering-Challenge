@@ -1,0 +1,43 @@
+id: simple_scheduling
+title: Routine appointment next week
+category: scheduling
+patient:
+  name: Maya Thompson
+  tone: polite
+  speaking_style: natural
+background:
+  reason: routine appointment
+  details:
+    preferred_day: Tuesday
+    preferred_time: "10:30 AM"
+    confirmed_slot: "Tuesday, July 1 at 10:30 AM"
+goal:
+  primary: Schedule a routine appointment for next week and confirm the final slot.
+  acceptable_outcomes:
+    - Appointment confirmed with date and time
+facts:
+  disclose_initially:
+    - Hi, I'm hoping to book a routine appointment for next week.
+  disclose_if_asked:
+    date_of_birth: "1993-08-14"
+    callback_number: "+15555550123"
+  withhold_until_needed:
+    - date_of_birth
+constraints:
+  max_duration_seconds: 180
+  allow_interruption: false
+  max_turns: 16
+evaluation:
+  high_severity_failures:
+    - Confirms a contradictory appointment time
+  medium_severity_failures:
+    - Ends without final confirmation
+  success_signals:
+    - Collects the needed details
+    - Confirms the date and time
+follow_up_questions:
+  - Should I arrive a little early?
+failure_signals:
+  - Contradictory confirmation
+desired_outcome: Confirm a routine appointment next week with a clear final summary.
+

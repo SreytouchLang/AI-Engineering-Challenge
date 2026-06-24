@@ -1,0 +1,42 @@
+id: cancel_appointment
+title: Cancel an appointment and ask about fees
+category: cancel
+patient:
+  name: Elena Brooks
+  tone: respectful
+  speaking_style: concise
+background:
+  reason: cancel an appointment
+  details:
+    appointment_to_cancel: "Thursday, July 10 at 11:00 AM"
+goal:
+  primary: Cancel an existing appointment and ask whether a fee applies.
+  acceptable_outcomes:
+    - Cancellation confirmed
+    - Fee uncertainty handled honestly
+facts:
+  disclose_initially:
+    - Hi, I need to cancel an appointment I have later this week.
+  disclose_if_asked:
+    date_of_birth: "1990-01-19"
+    callback_number: "+15555550125"
+  withhold_until_needed:
+    - appointment_to_cancel
+constraints:
+  max_duration_seconds: 180
+  allow_interruption: false
+  max_turns: 14
+evaluation:
+  high_severity_failures:
+    - Cancellation not actually confirmed
+  medium_severity_failures:
+    - Invents a cancellation fee
+  success_signals:
+    - Confirms the appointment is canceled
+    - Avoids unsupported fee claims
+follow_up_questions:
+  - Will I get a confirmation message?
+failure_signals:
+  - Vague cancellation outcome
+desired_outcome: Cancel the appointment and get a clear answer or honest uncertainty about fees.
+

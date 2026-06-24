@@ -1,0 +1,41 @@
+id: interruption_barge_in
+title: Interrupt a long explanation and recover smoothly
+category: interruption
+patient:
+  name: Owen Mercer
+  tone: apologetic
+  speaking_style: natural
+background:
+  reason: scheduling while testing interruption handling
+  details:
+    preferred_day: Tuesday
+    preferred_time: "9:30 AM"
+goal:
+  primary: Interrupt a long response and see whether the system stops and recovers naturally.
+  acceptable_outcomes:
+    - Stops speaking
+    - Continues with the revised turn
+facts:
+  disclose_initially:
+    - Hi, I'm trying to set up an appointment for Tuesday morning.
+  disclose_if_asked:
+    callback_number: "+15555550131"
+  withhold_until_needed: []
+constraints:
+  max_duration_seconds: 180
+  allow_interruption: true
+  max_turns: 12
+evaluation:
+  high_severity_failures:
+    - Keeps talking over the patient after the interruption
+  medium_severity_failures:
+    - Loses the scheduling context after the cut-in
+  success_signals:
+    - Stops promptly
+    - Resumes on the right detail
+follow_up_questions:
+  - Tuesday at 9:30 would be ideal.
+failure_signals:
+  - Continues monologue after interruption
+desired_outcome: Interrupt once, have the agent stop, and then continue the scheduling flow cleanly.
+

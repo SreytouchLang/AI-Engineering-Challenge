@@ -1,1 +1,194 @@
-# AI-Engineering-Challenge
+# Pretty Good AI Voice Tester
+
+This repository implements a Python voice-bot assessment harness for Pretty Good AI's authorized challenge number, `+1-805-439-8008`. The current build is intentionally split into two layers:
+
+1. A fully runnable local dry-run path that validates scenarios, simulates natural patient conversations, writes transcripts and metadata, and generates structured evaluations and bug reports.
+2. A guarded live-call path that uses Twilio bidirectional media streams plus OpenAI-based STT, text generation, and TTS. Live calling is disabled by default and requires both `ENABLE_REAL_CALLS=true` and an explicit confirmation flag.
+
+## Architecture Summary
+
+The live architecture uses Twilio to place and record the outbound call, then hands the audio to a FastAPI WebSocket endpoint using bidirectional media streams. Incoming office audio is segmented locally with a small VAD-style turn manager, transcribed with OpenAI STT, passed through a patient-state controller, and synthesized back into phone-ready mu-law audio for Twilio playback. Recordings, transcripts, evaluations, and metadata are stored as first-class artifacts so the bug-report step is traceable to exact calls.
+
+I chose request-based STT/TTS over a more complex speech-to-speech bridge because it keeps the repo much easier to debug and test inside a take-home while still supporting natural short-turn conversations. Inference: with short one-to-two-sentence patient replies, the expected post-turn latency should land around 1.2 to 2.2 seconds in a typical deployment, and 10 to 15 calls should usually stay within the challenge's sub-$20 budget target depending on call length, retranscription retries, and telephony rates.
+
+## Prerequisites
+
+- Python 3.11 or newer
+- `ffmpeg` available on `PATH` for audio conversion
+- A public HTTPS tunnel or deployment for Twilio webhooks during live calls
+- A Twilio account with one outbound voice number
+- OpenAI API access for the LLM, STT, and TTS paths
+
+## Account And Provider Setup
+
+1. Create the challenge product account at `pgai.us/athena`.
+2. Provision one Twilio number for all outbound assessment calls.
+3. Configure a public webhook base URL, for example with `ngrok http 8000`.
+4. Use the same OpenAI key for `LLM_API_KEY`, `STT_API_KEY`, and `TTS_API_KEY` if you are using OpenAI for all three services.
+
+## Environment Variables
+
+Copy `.env.example` to `.env` and fill in placeholders only:
+
+```bash
+ENABLE_REAL_CALLS=false
+AUTHORIZED_DESTINATION=+18054398008
+TELEPHONY_ACCOUNT_ID=
+TELEPHONY_AUTH_TOKEN=
+TELEPHONY_FROM_NUMBER=
+LLM_API_KEY=
+STT_API_KEY=
+TTS_API_KEY=
+PUBLIC_BASE_URL=
+MAX_CALL_DURATION_SECONDS=180
+MAX_CALLS_PER_RUN=1
+MONTHLY_COST_LIMIT_USD=20
+```
+
+## Local Webhook Or Tunnel Setup
+
+Run the API server locally:
+
+```bash
+make serve
+```
+
+Expose it publicly with a tunnel such as:
+
+```bash
+ngrok http 8000
+```
+
+Then set `PUBLIC_BASE_URL` to the public HTTPS origin.
+
+## Installation
+
+```bash
+make install
+```
+
+## Dry-Run Instructions
+
+Run a single text-only simulated call:
+
+```bash
+make dry-run SCENARIO=scenarios/01_simple_scheduling.yaml
+```
+
+This writes a transcript and metadata under `artifacts/` without dialing a phone number.
+
+## One-Call Instructions
+
+Preview the live call configuration first:
+
+```bash
+ENABLE_REAL_CALLS=true python scripts/run_call.py --scenario scenarios/01_simple_scheduling.yaml
+```
+
+Actually place the call only after reviewing the preview:
+
+```bash
+ENABLE_REAL_CALLS=true python scripts/run_call.py \
+  --scenario scenarios/01_simple_scheduling.yaml \
+  --confirm-live-call=true
+```
+
+Or with `make`:
+
+```bash
+make call SCENARIO=scenarios/01_simple_scheduling.yaml CONFIRM_REAL_CALL=true
+```
+
+## Scenario-Suite Instructions
+
+Run the dry-run suite:
+
+```bash
+make suite
+```
+
+## Artifact Locations
+
+- `artifacts/recordings/` stores MP3, OGG, or WAV recordings
+- `artifacts/transcripts/` stores human-readable and JSON transcripts
+- `artifacts/evaluations/` stores structured analysis output
+- `artifacts/call_metadata/` stores call metadata JSON
+
+## Test Instructions
+
+```bash
+make test
+```
+
+## Analysis And Reporting
+
+Analyze a completed call:
+
+```bash
+python scripts/analyze_call.py --call-id call-001
+```
+
+Review issues and build the Markdown bug report:
+
+```bash
+python scripts/build_report.py --review
+```
+
+## Cost Controls
+
+- The destination number is locked to `+18054398008`
+- Real calls require `ENABLE_REAL_CALLS=true`
+- Real calls also require `--confirm-live-call=true`
+- `MAX_CALL_DURATION_SECONDS` caps a single call
+- `MAX_CALLS_PER_RUN` and `MONTHLY_COST_LIMIT_USD` protect the run budget
+- `make suite` uses dry-run mode only
+
+## Safety Restrictions
+
+- Never change `AUTHORIZED_DESTINATION`
+- Never commit `.env` or live secrets
+- Never claim a real call succeeded without a provider call id and artifact files
+- Never treat dry-run artifacts as live-call evidence
+- Use only fictional patient details
+
+## Troubleshooting
+
+- If live calls fail immediately, confirm `PUBLIC_BASE_URL` is publicly reachable over HTTPS.
+- If the server starts but live media fails, confirm the tunnel allows WebSocket traffic.
+- If transcripts are empty in the live path, check STT credentials and the mu-law stream configuration.
+- If audio conversion fails, confirm `ffmpeg` is installed and on `PATH`.
+
+## Known Limitations
+
+- Real-call execution still requires valid provider credentials and manual verification of recordings.
+- The dry-run office agent is intentionally simple and exists to exercise the patient and reporting pipeline, not to replace the real challenge line.
+- The live path is production-oriented but still needs real-call iteration to tune latency, interruption thresholds, and prompt style.
+- The current audio conversion helpers use Python's `audioop`, which is deprecated in Python 3.13 and should be replaced with a dedicated codec path before a long-lived production deployment.
+
+## Loom Walkthrough Link Placeholder
+
+- Main walkthrough: `TBD`
+- AI debugging walkthrough: `TBD`
+
+## Final Submission Checklist
+
+- [ ] Public GitHub repository is accessible
+- [x] Python code runs locally in dry-run mode
+- [x] README contains setup and run instructions
+- [x] `.env.example` exists
+- [x] No secrets are committed
+- [x] Architecture explanation is included
+- [ ] At least 10 complete real calls are included
+- [ ] Every real call has an MP3 or OGG recording
+- [ ] Every real call has a transcript with both speakers
+- [x] Only the authorized assessment number is permitted in code
+- [x] Only one originating number is supported by configuration
+- [ ] Bug report cites approved live-call findings
+- [x] Strong findings are prioritized over weak ones in the reporting path
+- [x] Iteration notes are documented honestly
+- [x] Main Loom script is included
+- [x] AI debugging Loom script is included
+- [x] All tests pass
+- [ ] Recordings were manually checked for natural conversation quality
+- [x] Repository uses fictional patient information only
+- [ ] Submission form information is ready

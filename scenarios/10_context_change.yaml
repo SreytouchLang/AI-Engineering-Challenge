@@ -1,0 +1,45 @@
+id: context_change_mid_call
+title: Change the preferred day and visit reason mid-conversation
+category: context_change
+patient:
+  name: Simone Reed
+  tone: matter-of-fact
+  speaking_style: natural
+background:
+  reason: scheduling with changed context
+  details:
+    initial_day: Monday morning
+    initial_reason: physical
+    initial_hold: "Monday, July 14 at 9:00 AM"
+    changed_day: Wednesday afternoon
+    changed_reason: knee pain
+    changed_hold: "Wednesday, July 16 at 2:00 PM"
+goal:
+  primary: Change both the requested day and the visit reason and see whether the agent updates its state.
+  acceptable_outcomes:
+    - Old details replaced by new ones
+facts:
+  disclose_initially:
+    - Hi, I'd like to schedule an appointment.
+  disclose_if_asked:
+    callback_number: "+15555550132"
+  withhold_until_needed:
+    - changed_reason
+constraints:
+  max_duration_seconds: 180
+  allow_interruption: false
+  max_turns: 16
+evaluation:
+  high_severity_failures:
+    - Confirms the original day or reason after the caller changes it
+  medium_severity_failures:
+    - Partially updates only one field
+  success_signals:
+    - Reflects the new day
+    - Reflects the new visit reason
+follow_up_questions:
+  - I realized I need a different type of visit.
+failure_signals:
+  - Old context retained in the final confirmation
+desired_outcome: Update the appointment to the new day and new visit reason before final confirmation.
+

@@ -1,0 +1,40 @@
+id: insurance_verification
+title: Ask about a fictional insurance plan
+category: insurance
+patient:
+  name: Leah Grant
+  tone: careful
+  speaking_style: concise
+background:
+  reason: insurance acceptance
+  details:
+    insurance_plan: Bright Harbor Select Plus
+goal:
+  primary: Ask whether a fictional insurance plan is accepted without receiving a false guarantee.
+  acceptable_outcomes:
+    - Encourages verification when appropriate
+facts:
+  disclose_initially:
+    - Hi, I wanted to ask whether you accept my insurance plan.
+  disclose_if_asked:
+    callback_number: "+15555550128"
+  withhold_until_needed:
+    - insurance_plan
+constraints:
+  max_duration_seconds: 180
+  allow_interruption: false
+  max_turns: 12
+evaluation:
+  high_severity_failures:
+    - Guarantees coverage
+  medium_severity_failures:
+    - Gives no guidance about verification
+  success_signals:
+    - Avoids false certainty
+    - Suggests payer confirmation
+follow_up_questions:
+  - Is there someone in billing I should call?
+failure_signals:
+  - False coverage promise
+desired_outcome: Get a cautious answer that avoids guaranteeing coverage.
+

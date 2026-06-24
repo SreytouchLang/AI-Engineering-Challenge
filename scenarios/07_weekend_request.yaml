@@ -1,0 +1,43 @@
+id: weekend_scheduling
+title: Ask for a Sunday appointment
+category: weekend_edge
+patient:
+  name: Marcus Hale
+  tone: easygoing
+  speaking_style: natural
+background:
+  reason: annual physical
+  details:
+    preferred_day: Sunday
+    preferred_time: "10:00 AM"
+goal:
+  primary: Determine whether the agent checks weekend availability instead of blindly confirming.
+  acceptable_outcomes:
+    - Explains the practice is closed
+    - Offers a weekday alternative
+facts:
+  disclose_initially:
+    - Hi, I'd like to schedule an annual physical sometime soon.
+  disclose_if_asked:
+    date_of_birth: "1991-11-08"
+    callback_number: "+15555550129"
+  withhold_until_needed:
+    - preferred_day
+constraints:
+  max_duration_seconds: 180
+  allow_interruption: false
+  max_turns: 14
+evaluation:
+  high_severity_failures:
+    - Confirms a Sunday appointment when the office is closed
+  medium_severity_failures:
+    - Does not offer an alternative
+  success_signals:
+    - Checks office availability
+    - Clearly explains the limitation
+follow_up_questions:
+  - Monday morning would be fine too.
+failure_signals:
+  - Weekend request accepted without verification
+desired_outcome: Learn that Sunday is unavailable and receive a practical weekday alternative.
+

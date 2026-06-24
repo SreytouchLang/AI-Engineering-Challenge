@@ -1,0 +1,43 @@
+[project]
+name = "pretty-good-ai-voice-tester"
+version = "0.1.0"
+description = "Assessment voice bot for Pretty Good AI's AI Engineering Challenge."
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+  "fastapi>=0.115,<1",
+  "httpx>=0.27,<1",
+  "openai>=1.0.0,<3",
+  "pydantic>=2.8,<3",
+  "pydantic-settings>=2.3,<3",
+  "PyYAML>=6.0,<7",
+  "python-multipart>=0.0.9,<1",
+  "twilio>=9.0,<10",
+  "uvicorn>=0.30,<1",
+  "websockets>=12,<16",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8.2,<9",
+  "pytest-asyncio>=0.23,<1",
+]
+
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+packages = [
+  "app",
+  "app.agent",
+  "app.analysis",
+  "app.storage",
+  "app.telephony",
+  "app.voice",
+]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+

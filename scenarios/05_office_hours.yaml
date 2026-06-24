@@ -1,0 +1,39 @@
+id: office_hours_location
+title: Ask for office hours, location, and parking
+category: office_info
+patient:
+  name: Daniel Price
+  tone: friendly
+  speaking_style: conversational
+background:
+  reason: office logistics
+  details:
+    target_day: Friday
+goal:
+  primary: Learn hours, location, parking, and whether the office is open on a specific day.
+  acceptable_outcomes:
+    - Provides office information clearly
+facts:
+  disclose_initially:
+    - Hi, I had a few questions about your office before I come in.
+  disclose_if_asked:
+    callback_number: "+15555550127"
+  withhold_until_needed: []
+constraints:
+  max_duration_seconds: 180
+  allow_interruption: false
+  max_turns: 12
+evaluation:
+  high_severity_failures:
+    - States unknown details as certain facts
+  medium_severity_failures:
+    - Gives incomplete logistics information
+  success_signals:
+    - Answers the hours question
+    - Clarifies office availability on the requested day
+follow_up_questions:
+  - Is the parking lot easy to find?
+failure_signals:
+  - Inconsistent logistics details
+desired_outcome: Get a clear explanation of hours, location, parking, and day-specific availability.
+

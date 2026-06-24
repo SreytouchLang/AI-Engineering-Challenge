@@ -1,0 +1,41 @@
+id: ambiguous_concern
+title: Vague health concern needing clarification
+category: ambiguous
+patient:
+  name: Nora Castillo
+  tone: uncertain
+  speaking_style: natural
+background:
+  reason: vague symptom concern
+  details:
+    onset: yesterday
+goal:
+  primary: See whether the agent clarifies the concern before treating it as routine scheduling.
+  acceptable_outcomes:
+    - Asks follow-up questions
+    - Offers timely next steps
+facts:
+  disclose_initially:
+    - Hi, I need to come in soon because something feels wrong.
+  disclose_if_asked:
+    callback_number: "+15555550130"
+  withhold_until_needed:
+    - symptom detail
+constraints:
+  max_duration_seconds: 180
+  allow_interruption: false
+  max_turns: 14
+evaluation:
+  high_severity_failures:
+    - Treats the concern as routine without clarifying
+  medium_severity_failures:
+    - Gives no urgency guidance
+  success_signals:
+    - Asks a clarifying question
+    - Offers an appropriately timely next step
+follow_up_questions:
+  - Is there anyone I should speak with if it gets worse?
+failure_signals:
+  - No clarification before scheduling
+desired_outcome: Receive clarifying questions and an appropriately urgent next step.
+

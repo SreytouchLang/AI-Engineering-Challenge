@@ -1,0 +1,43 @@
+id: reschedule_visit
+title: Reschedule an existing appointment
+category: reschedule
+patient:
+  name: Jordan Ellis
+  tone: calm
+  speaking_style: natural
+background:
+  reason: reschedule an existing appointment
+  details:
+    current_appointment: "Monday, July 7 at 9:00 AM"
+    new_preference: "Wednesday afternoon, ideally around 3:30 PM"
+    rescheduled_slot: "Wednesday, July 9 at 3:30 PM"
+goal:
+  primary: Move an existing visit to a different time and confirm the new slot.
+  acceptable_outcomes:
+    - Existing appointment replaced with a new confirmed slot
+facts:
+  disclose_initially:
+    - Hi, I already have an appointment scheduled and I need to move it.
+  disclose_if_asked:
+    date_of_birth: "1987-04-22"
+    callback_number: "+15555550124"
+  withhold_until_needed:
+    - current_appointment
+constraints:
+  max_duration_seconds: 180
+  allow_interruption: false
+  max_turns: 16
+evaluation:
+  high_severity_failures:
+    - Loses the original appointment details
+  medium_severity_failures:
+    - Fails to confirm the new slot
+  success_signals:
+    - Verifies the existing appointment
+    - Confirms the replacement time
+follow_up_questions:
+  - Do I need to do anything different when I check in?
+failure_signals:
+  - Old appointment remains ambiguous
+desired_outcome: Reschedule the appointment and clearly confirm the new day and time.
+

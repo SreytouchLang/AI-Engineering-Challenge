@@ -1,0 +1,41 @@
+id: repetition_recovery
+title: Correct a mistaken name and day
+category: repetition_recovery
+patient:
+  name: Camille Ross
+  tone: patient
+  speaking_style: natural
+background:
+  reason: schedule an appointment while testing correction retention
+  details:
+    wrong_requested_day: Thursday
+    correct_requested_day: Tuesday
+goal:
+  primary: Correct a mistaken name or date and see whether the correction is retained.
+  acceptable_outcomes:
+    - Agent uses the corrected information going forward
+facts:
+  disclose_initially:
+    - Hi, I'm calling to schedule an appointment for next week.
+  disclose_if_asked:
+    callback_number: "+15555550134"
+  withhold_until_needed:
+    - correct_requested_day
+constraints:
+  max_duration_seconds: 180
+  allow_interruption: false
+  max_turns: 14
+evaluation:
+  high_severity_failures:
+    - Repeats the wrong name after the patient corrects it
+  medium_severity_failures:
+    - Forgets the corrected day
+  success_signals:
+    - Retains the corrected identity
+    - Retains the corrected day
+follow_up_questions:
+  - Tuesday is the day I actually need.
+failure_signals:
+  - Correction not retained
+desired_outcome: Correct the mistaken identity or date once and have the agent retain the update.
+
