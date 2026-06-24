@@ -1,9 +1,8 @@
 from __future__ import annotations
 
-import audioop
 from dataclasses import dataclass
 
-from app.voice.audio import pcm16_to_wav_bytes
+from app.voice.audio import mulaw_to_pcm16, pcm16_rms, pcm16_to_wav_bytes
 
 
 @dataclass(slots=True)
@@ -47,8 +46,8 @@ class TurnManager:
         self._reset()
 
     def ingest_mulaw_frame(self, payload: bytes, timestamp_ms: int) -> TurnEvent:
-        pcm = audioop.ulaw2lin(payload, 2)
-        rms = audioop.rms(pcm, 2)
+        pcm = mulaw_to_pcm16(payload)
+        rms = pcm16_rms(pcm)
         is_speech = rms >= self.rms_threshold
         frame_ms = max(1, int(round(len(payload) / 8)))
         event = TurnEvent()

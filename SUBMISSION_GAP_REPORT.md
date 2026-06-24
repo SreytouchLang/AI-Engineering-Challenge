@@ -7,7 +7,7 @@ Audit date: 2026-06-24 (America/Los_Angeles)
 - `make format-check`: PASS
 - `make lint`: PASS
 - `make typecheck`: PASS
-- `make test`: PASS (`39 passed`)
+- `make test`: PASS (`46 passed`)
 - `python scripts/validate_scenarios.py`: PASS
 - `python scripts/preflight_live_call.py --scenario scenarios/01_simple_scheduling.yaml`: honest FAIL because live-call credentials and webhook configuration are still missing
 - `make submission-check`: `FINAL STATUS: NOT READY`
@@ -28,6 +28,7 @@ Audit date: 2026-06-24 (America/Los_Angeles)
 
 - Live-call preflight now fails cleanly only on external blockers: `ENABLE_REAL_CALLS=false`, missing Twilio credentials, missing OpenAI credentials, missing `TELEPHONY_FROM_NUMBER`, and missing `PUBLIC_BASE_URL`.
 - Scenario validation passes locally with 12 scenarios covering the required categories, including interruption, correction, and urgent-symptom escalation flows.
+- The deprecated `audioop` dependency has been removed from the local audio path, so the test suite now runs without the earlier Python 3.13 deprecation warning.
 - The recording, transcript, review, and bug-report pipelines now reject dry-run evidence instead of letting placeholder artifacts look submission-ready.
 - `make submission-check` is intentionally strict and will stay `NOT READY` until real-call, manual-review, Loom, and submission-form evidence exists.
 

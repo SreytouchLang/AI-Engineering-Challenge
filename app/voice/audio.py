@@ -1,12 +1,20 @@
 from __future__ import annotations
 
-import audioop
 import io
 import json
+import math
 import subprocess
+import sys
 import wave
+from array import array
+from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
+
+_PCM16_MAX = 32767
+_PCM16_MIN = -32768
+_MULAW_BIAS = 0x84
+_MULAW_CLIP = 32635
 
 
 @dataclass(frozen=True, slots=True)
@@ -16,7 +24,18 @@ class TimedPcmSegment:
 
 
 def mulaw_to_pcm16(mulaw_bytes: bytes) -> bytes:
-    return audioop.ulaw2lin(mulaw_bytes, 2)
+    samples = array("h", (_decode_mulaw_byte(value) for value in mulaw_bytes))
+    if sys.byteorder != "little":
+        samples.byteswap()
+    return samples.tobytes()
+
+
+def pcm16_to_mulaw(pcm_bytes: bytes) -> bytes:
+    samples = _pcm16_array(pcm_bytes)
+    encoded = bytearray(len(samples))
+    for index, sample in enumerate(samples):
+        encoded[index] = _encode_mulaw_sample(sample)
+    return bytes(encoded)
 
 
 def pcm16_to_wav_bytes(
@@ -43,9 +62,9 @@ def wav_bytes_to_pcm16(wav_bytes: bytes) -> bytes:
     if sample_width != 2:
         raise ValueError("Only 16-bit PCM WAV inputs are supported.")
     if channels == 2:
-        pcm = audioop.tomono(pcm, sample_width, 0.5, 0.5)
+        pcm = stereo_pcm16_to_mono(pcm)
     if sample_rate != 8000:
-        pcm, _ = audioop.ratecv(pcm, sample_width, 1, sample_rate, 8000, None)
+        pcm = resample_pcm16(pcm, sample_rate=sample_rate, target_sample_rate=8000)
     return pcm
 
 
@@ -60,12 +79,12 @@ def wav_to_mulaw(wav_bytes: bytes) -> bytes:
         raise ValueError("Only 16-bit PCM WAV inputs are supported.")
 
     if channels == 2:
-        pcm = audioop.tomono(pcm, sample_width, 0.5, 0.5)
+        pcm = stereo_pcm16_to_mono(pcm)
 
     if sample_rate != 8000:
-        pcm, _ = audioop.ratecv(pcm, sample_width, 1, sample_rate, 8000, None)
+        pcm = resample_pcm16(pcm, sample_rate=sample_rate, target_sample_rate=8000)
 
-    return audioop.lin2ulaw(pcm, 2)
+    return pcm16_to_mulaw(pcm)
 
 
 def chunk_mulaw_audio(mulaw_bytes: bytes, chunk_size: int = 160) -> list[bytes]:
@@ -87,6 +106,52 @@ def silence_pcm16(duration_ms: int, sample_rate: int = 8000) -> bytes:
     return b"\x00\x00" * frame_count
 
 
+def pcm16_rms(pcm_bytes: bytes) -> int:
+    samples = _pcm16_array(pcm_bytes)
+    if not samples:
+        return 0
+    mean_square = sum(sample * sample for sample in samples) / len(samples)
+    return int(round(math.sqrt(mean_square)))
+
+
+def stereo_pcm16_to_mono(pcm_bytes: bytes) -> bytes:
+    samples = _pcm16_array(pcm_bytes)
+    if len(samples) % 2 != 0:
+        raise ValueError("Stereo PCM must contain an even number of samples.")
+    mono_samples = [_clip_pcm16(int(round((samples[index] + samples[index + 1]) / 2))) for index in range(0, len(samples), 2)]
+    return _pcm16_bytes(mono_samples)
+
+
+def resample_pcm16(
+    pcm_bytes: bytes,
+    *,
+    sample_rate: int,
+    target_sample_rate: int,
+) -> bytes:
+    if sample_rate <= 0 or target_sample_rate <= 0:
+        raise ValueError("Sample rates must be positive integers.")
+    samples = list(_pcm16_array(pcm_bytes))
+    if not samples or sample_rate == target_sample_rate:
+        return pcm_bytes
+
+    target_length = max(1, int(round(len(samples) * target_sample_rate / sample_rate)))
+    if len(samples) == 1:
+        return _pcm16_bytes([samples[0]] * target_length)
+
+    scale = (len(samples) - 1) / max(1, target_length - 1)
+    resampled: list[int] = []
+    for index in range(target_length):
+        source_position = index * scale
+        left_index = int(source_position)
+        right_index = min(left_index + 1, len(samples) - 1)
+        fraction = source_position - left_index
+        left = samples[left_index]
+        right = samples[right_index]
+        interpolated = left if left_index == right_index else round(left + ((right - left) * fraction))
+        resampled.append(_clip_pcm16(interpolated))
+    return _pcm16_bytes(resampled)
+
+
 def render_timed_pcm_track(
     segments: list[TimedPcmSegment],
     *,
@@ -106,7 +171,7 @@ def render_timed_pcm_track(
             track.extend(b"\x00" * (end_byte - len(track)))
         existing = bytes(track[start_byte:end_byte])
         if any(existing):
-            mixed = audioop.add(existing, segment.pcm_bytes, 2)
+            mixed = add_pcm16(existing, segment.pcm_bytes)
             track[start_byte:end_byte] = mixed
         else:
             track[start_byte:end_byte] = segment.pcm_bytes
@@ -122,7 +187,7 @@ def mix_pcm16_tracks(track_a: bytes, track_b: bytes) -> bytes:
         return track_b
     if not track_b:
         return track_a
-    return audioop.add(track_a, track_b, 2)
+    return add_pcm16(track_a, track_b)
 
 
 def wav_duration_seconds(path: str) -> float:
@@ -152,3 +217,47 @@ def audio_duration_seconds(path: str | Path) -> float:
     )
     payload = json.loads(result.stdout or "{}")
     return float(payload.get("format", {}).get("duration", 0.0))
+
+
+def add_pcm16(first: bytes, second: bytes) -> bytes:
+    if len(first) != len(second):
+        raise ValueError("PCM buffers must be the same length to be mixed.")
+    samples_a = _pcm16_array(first)
+    samples_b = _pcm16_array(second)
+    return _pcm16_bytes(_clip_pcm16(left + right) for left, right in zip(samples_a, samples_b, strict=True))
+
+
+def _pcm16_array(pcm_bytes: bytes) -> array[int]:
+    if len(pcm_bytes) % 2 != 0:
+        raise ValueError("PCM16 byte buffers must contain an even number of bytes.")
+    samples: array[int] = array("h")
+    samples.frombytes(pcm_bytes)
+    if sys.byteorder != "little":
+        samples.byteswap()
+    return samples
+
+
+def _pcm16_bytes(samples: Iterable[int]) -> bytes:
+    pcm = array("h", (_clip_pcm16(int(sample)) for sample in samples))
+    if sys.byteorder != "little":
+        pcm.byteswap()
+    return pcm.tobytes()
+
+
+def _clip_pcm16(value: int) -> int:
+    return max(_PCM16_MIN, min(_PCM16_MAX, value))
+
+
+def _decode_mulaw_byte(value: int) -> int:
+    inverted = (~value) & 0xFF
+    magnitude = (((inverted & 0x0F) << 3) + _MULAW_BIAS) << ((inverted >> 4) & 0x07)
+    sample = magnitude - _MULAW_BIAS
+    return -sample if inverted & 0x80 else sample
+
+
+def _encode_mulaw_sample(sample: int) -> int:
+    sign = 0x80 if sample < 0 else 0
+    magnitude = min(abs(sample), _MULAW_CLIP) + _MULAW_BIAS
+    exponent = min(7, max(0, magnitude.bit_length() - 8))
+    mantissa = (magnitude >> (exponent + 3)) & 0x0F
+    return (~(sign | (exponent << 4) | mantissa)) & 0xFF

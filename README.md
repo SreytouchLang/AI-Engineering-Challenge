@@ -255,7 +255,7 @@ make submission-check
 - Real-call execution still requires valid provider credentials and manual verification of recordings.
 - The dry-run office agent is intentionally simple and exists to exercise the patient and reporting pipeline, not to replace the real challenge line.
 - The live path is production-oriented but still needs real-call iteration to tune latency, interruption thresholds, and prompt style.
-- The current audio conversion helpers use Python's `audioop`, which is deprecated in Python 3.13 and should be replaced with a dedicated codec path before a long-lived production deployment.
+- The audio path now uses local G.711 mu-law, PCM mixing, and linear resampling helpers; a more specialized DSP/codec stack would still be preferable for a long-lived production deployment.
 - Dual-channel capture is requested from Twilio and also reconstructed locally, but real-call verification is still required to confirm the provider-side channels and recordings behave as expected on actual calls.
 
 ## Loom Walkthrough Link Placeholder

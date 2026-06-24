@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-import audioop
 import struct
 
+from app.voice.audio import pcm16_to_mulaw
 from app.voice.interruption import InterruptionController
 from app.voice.turn_manager import TurnManager
 
@@ -10,7 +10,7 @@ from app.voice.turn_manager import TurnManager
 def make_mulaw_frame(amplitude: int, duration_ms: int = 20) -> bytes:
     samples = int(8000 * duration_ms / 1000)
     pcm = b"".join(struct.pack("<h", amplitude) for _ in range(samples))
-    return audioop.lin2ulaw(pcm, 2)
+    return pcm16_to_mulaw(pcm)
 
 
 def test_turn_manager_detects_a_completed_turn() -> None:
