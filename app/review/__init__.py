@@ -1,0 +1,2 @@
+"""Lightweight local review UI."""
+

@@ -71,6 +71,11 @@ class AppSettings(BaseSettings):
     vad_rms_threshold: int = Field(default=300, ge=1, le=5000)
     min_speech_ms: int = Field(default=350, ge=50, le=5000)
     end_of_turn_silence_ms: int = Field(default=850, ge=100, le=5000)
+    max_end_of_turn_silence_ms: int = Field(default=1400, ge=150, le=6000)
+    patient_barge_in_trigger_ms: int = Field(default=2600, ge=500, le=10000)
+    transcript_gap_threshold_ms: int = Field(default=4500, ge=250, le=15000)
+    transcript_confidence_threshold: float = Field(default=0.65, ge=0, le=1)
+    duration_mismatch_tolerance_seconds: float = Field(default=1.5, ge=0)
     expected_cost_per_call_usd: float = Field(default=1.25, ge=0)
 
     @field_validator("authorized_destination")

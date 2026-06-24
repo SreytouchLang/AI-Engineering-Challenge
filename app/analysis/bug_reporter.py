@@ -4,6 +4,7 @@ from pathlib import Path
 from typing import Callable
 
 from app.analysis.schemas import CallEvaluation, EvaluationIssue, Severity
+from app.storage.metadata import CallMetadata
 
 
 def review_issues(
@@ -34,16 +35,22 @@ def review_issues(
 
 def build_bug_report(
     evaluations: list[CallEvaluation],
+    metadata_by_call: dict[str, CallMetadata],
     output_path: Path,
     *,
     include_pending: bool = False,
 ) -> str:
     issues: list[tuple[CallEvaluation, EvaluationIssue]] = []
+    included_calls: set[str] = set()
     for evaluation in evaluations:
+        metadata = metadata_by_call.get(evaluation.call_id)
+        if metadata is not None and metadata.transcript_validation_status != "passed":
+            continue
+        included_calls.add(evaluation.call_id)
         for issue in evaluation.issues:
-            if issue.review_status == "approved" or (
-                include_pending and issue.review_status == "pending"
-            ):
+            if not _issue_is_reportable(issue):
+                continue
+            if issue.review_status == "approved" or (include_pending and issue.review_status == "pending"):
                 issues.append((evaluation, issue))
 
     severities = {severity.value: 0 for severity in Severity}
@@ -55,8 +62,8 @@ def build_bug_report(
         "",
         "## Executive Summary",
         "",
-        f"- Calls completed: {len(evaluations)}",
-        f"- Scenarios tested: {len({evaluation.scenario_id for evaluation in evaluations})}",
+        f"- Calls completed: {len(included_calls)}",
+        f"- Scenarios tested: {len({evaluation.scenario_id for evaluation in evaluations if evaluation.call_id in included_calls})}",
         f"- High-severity issues: {severities['high']}",
         f"- Medium-severity issues: {severities['medium']}",
         f"- Low-severity issues: {severities['low']}",
@@ -72,6 +79,13 @@ def build_bug_report(
         lines.append("No approved bugs yet. Run `python scripts/analyze_call.py` and `python scripts/build_report.py --review` after real calls exist.")
     else:
         for index, (evaluation, issue) in enumerate(issues, start=1):
+            metadata = metadata_by_call.get(evaluation.call_id)
+            transcript_link = issue.transcript_path or (metadata.transcript_path if metadata else None)
+            recording_link = issue.recording_path or (
+                metadata.mixed_recording_path or metadata.recording_path if metadata else None
+            )
+            relative_transcript = transcript_link or f"artifacts/transcripts/{evaluation.call_id}.txt"
+            relative_recording = recording_link or f"artifacts/recordings/{evaluation.call_id}-mixed.mp3"
             lines.extend(
                 [
                     f"## BUG-{index:03d}: {issue.title}",
@@ -79,13 +93,15 @@ def build_bug_report(
                     f"**Severity:** {issue.severity.value.title()}  ",
                     f"**Category:** {issue.category}  ",
                     f"**Call:** `{evaluation.call_id}`  ",
-                    f"**Transcript:** `artifacts/transcripts/{evaluation.call_id}.txt`  ",
-                    f"**Recording:** `artifacts/recordings/{evaluation.call_id}.mp3`  ",
+                    f"**Scenario:** `{evaluation.scenario_id}`  ",
+                    f"**Transcript:** [{Path(relative_transcript).name}]({relative_transcript})  ",
+                    f"**Recording:** [{Path(relative_recording).name}]({relative_recording})  ",
                     f"**Timestamp:** {issue.timestamp}  ",
+                    f"**Human Review:** {issue.review_status}  ",
                     "",
                     "### What happened",
                     "",
-                    issue.evidence,
+                    issue.actual_behavior or issue.evidence,
                     "",
                     "### Why it matters",
                     "",
@@ -97,13 +113,15 @@ def build_bug_report(
                     "",
                     "### Evidence",
                     "",
-                    issue.evidence,
+                    issue.evidence_excerpt or issue.evidence,
                     "",
                     "### Reproduction steps",
                     "",
-                    "1. Run the scenario associated with this call.",
-                    "2. Listen at the cited timestamp and compare against the transcript.",
-                    "3. Observe whether the agent repeats the same failure mode.",
+                    *[f"{step_index}. {step}" for step_index, step in enumerate(issue.reproduction_steps or [
+                        "Run the scenario associated with this call.",
+                        "Listen at the cited timestamp and compare against the transcript.",
+                        "Observe whether the agent repeats the same failure mode.",
+                    ], start=1)],
                     "",
                 ]
             )
@@ -115,15 +133,33 @@ def build_bug_report(
 
 def _edit_issue(issue: EvaluationIssue, input_fn: Callable[[str], str]) -> None:
     title = input_fn(f"Title [{issue.title}]: ").strip()
+    severity = input_fn(f"Severity [{issue.severity.value}]: ").strip().lower()
     category = input_fn(f"Category [{issue.category}]: ").strip()
     expected = input_fn(f"Expected behavior [{issue.expected_behavior}]: ").strip()
+    actual = input_fn(f"Actual behavior [{issue.actual_behavior or issue.evidence}]: ").strip()
     impact = input_fn(f"User impact [{issue.user_impact}]: ").strip()
+    notes = input_fn(f"Reviewer notes [{issue.review_notes or ''}]: ").strip()
     if title:
         issue.title = title
+    if severity:
+        issue.severity = Severity(severity)
     if category:
         issue.category = category
     if expected:
         issue.expected_behavior = expected
+    if actual:
+        issue.actual_behavior = actual
     if impact:
         issue.user_impact = impact
+    if notes:
+        issue.review_notes = notes
 
+
+def _issue_is_reportable(issue: EvaluationIssue) -> bool:
+    if not issue.timestamp or not issue.evidence or not issue.expected_behavior:
+        return False
+    if issue.transcript_confidence is not None and issue.transcript_confidence < 0.65:
+        return False
+    if issue.duplicate_of:
+        return False
+    return True

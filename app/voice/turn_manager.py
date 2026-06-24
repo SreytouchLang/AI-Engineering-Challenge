@@ -18,6 +18,7 @@ class CompletedTurn:
 @dataclass(slots=True)
 class TurnEvent:
     speech_started: bool = False
+    speech_ongoing_ms: int = 0
     completed_turn: CompletedTurn | None = None
 
 
@@ -30,10 +31,16 @@ class TurnManager:
         rms_threshold: int,
         min_speech_ms: int,
         end_of_turn_silence_ms: int,
+        max_end_of_turn_silence_ms: int | None = None,
     ) -> None:
         self.rms_threshold = rms_threshold
         self.min_speech_ms = min_speech_ms
         self.end_of_turn_silence_ms = end_of_turn_silence_ms
+        self.max_end_of_turn_silence_ms = (
+            max_end_of_turn_silence_ms
+            if max_end_of_turn_silence_ms is not None
+            else end_of_turn_silence_ms
+        )
         self._reset()
 
     def ingest_mulaw_frame(self, payload: bytes, timestamp_ms: int) -> TurnEvent:
@@ -57,13 +64,15 @@ class TurnManager:
         if is_speech:
             self.last_speech_ms = timestamp_ms
             self.speech_duration_ms += frame_ms
+            event.speech_ongoing_ms = self.speech_duration_ms
 
         silence_ms = timestamp_ms - self.last_speech_ms if self.last_speech_ms is not None else 0
+        required_silence_ms = self._required_silence_ms()
         if (
             self.in_speech
             and not is_speech
             and self.speech_duration_ms >= self.min_speech_ms
-            and silence_ms >= self.end_of_turn_silence_ms
+            and silence_ms >= required_silence_ms
         ):
             event.completed_turn = self._flush(timestamp_ms)
 
@@ -88,6 +97,14 @@ class TurnManager:
         self._reset()
         return completed
 
+    def _required_silence_ms(self) -> int:
+        adaptive_silence = self.end_of_turn_silence_ms
+        if self.speech_duration_ms >= 2400:
+            adaptive_silence += 250
+        elif self.speech_duration_ms <= 700:
+            adaptive_silence = max(self.end_of_turn_silence_ms - 150, 120)
+        return min(adaptive_silence, self.max_end_of_turn_silence_ms)
+
     def _reset(self) -> None:
         self.buffer = bytearray()
         self.in_speech = False
@@ -97,3 +114,10 @@ class TurnManager:
         self.rms_total = 0.0
         self.samples_seen = 0
 
+    @property
+    def current_turn_start_ms(self) -> int | None:
+        return self.turn_start_ms
+
+    @property
+    def current_speech_duration_ms(self) -> int:
+        return self.speech_duration_ms

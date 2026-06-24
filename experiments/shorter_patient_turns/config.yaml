@@ -1,0 +1,13 @@
+id: shorter_patient_turns
+baseline:
+  id: prompt_v1_verbose
+  response_style: verbose
+candidate:
+  id: prompt_v2_concise
+  response_style: concise
+scenarios:
+  - simple_scheduling
+  - interruption_barge_in
+  - medication_refill
+budget_limit_usd: 4.0
+maximum_calls: 6

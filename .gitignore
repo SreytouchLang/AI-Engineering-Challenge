@@ -8,10 +8,13 @@ __pycache__/
 *.pyc
 artifacts/call_metadata/*.json
 artifacts/evaluations/*.json
+artifacts/quality/*.json
+artifacts/quality/*.md
 artifacts/recordings/*.mp3
 artifacts/recordings/*.ogg
 artifacts/recordings/*.wav
 artifacts/transcripts/*.json
 artifacts/transcripts/*.txt
+artifacts/validation/*.json
+artifacts/validation/*.md
 tmp/
-

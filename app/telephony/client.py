@@ -53,6 +53,8 @@ class TwilioTelephonyClient:
                 from_=self.settings.telephony_from_number,
                 twiml=twiml,
                 record=True,
+                recording_channels="dual",
+                recording_track="both",
                 time_limit=self.settings.max_call_duration_seconds,
                 status_callback=f"{base_url}{self.settings.twilio_status_callback_path}",
                 recording_status_callback=(

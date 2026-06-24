@@ -287,7 +287,14 @@ class ConversationEvaluator:
             category=category,
             timestamp=format_segment_timestamp(segment.start_timestamp),
             evidence=segment.text,
+            evidence_excerpt=segment.text,
+            actual_behavior=segment.text,
             expected_behavior=expected_behavior,
             user_impact=user_impact,
+            reproduction_steps=[
+                "Run the scenario associated with this call.",
+                "Listen at the cited timestamp and compare it against the transcript.",
+                "Confirm whether the agent repeats the same behavior.",
+            ],
             confidence=0.87,
         )

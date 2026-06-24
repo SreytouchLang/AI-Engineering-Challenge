@@ -5,6 +5,16 @@ This repository implements a Python voice-bot assessment harness for Pretty Good
 1. A fully runnable local dry-run path that validates scenarios, simulates natural patient conversations, writes transcripts and metadata, and generates structured evaluations and bug reports.
 2. A guarded live-call path that uses Twilio bidirectional media streams plus OpenAI-based STT, text generation, and TTS. Live calling is disabled by default and requires both `ENABLE_REAL_CALLS=true` and an explicit confirmation flag.
 
+Phase 2 enhancements now added on top of the original scaffold:
+
+- adaptive patient action planning instead of fixed turn scripts
+- cancellable chunked playback for more realistic turn-taking
+- explicit barge-in and overlap tracking
+- dual-channel recording artifacts (`patient`, `agent`, and `mixed`)
+- transcript validation gates and voice-quality scorecards
+- evidence-linked bug objects plus a local FastAPI review UI
+- replay mode and a dry-run A/B experiment harness
+
 ## Architecture Summary
 
 The live architecture uses Twilio to place and record the outbound call, then hands the audio to a FastAPI WebSocket endpoint using bidirectional media streams. Incoming office audio is segmented locally with a small VAD-style turn manager, transcribed with OpenAI STT, passed through a patient-state controller, and synthesized back into phone-ready mu-law audio for Twilio playback. Recordings, transcripts, evaluations, and metadata are stored as first-class artifacts so the bug-report step is traceable to exact calls.
@@ -134,6 +144,24 @@ Review issues and build the Markdown bug report:
 python scripts/build_report.py --review
 ```
 
+Replay a saved call without redialing:
+
+```bash
+python scripts/replay_call.py --call-id call-021
+```
+
+Run the built-in A/B experiment:
+
+```bash
+python scripts/run_experiment.py --config experiments/shorter_patient_turns/config.yaml
+```
+
+Open the local review dashboard after `make serve`:
+
+```text
+http://localhost:8000/review/
+```
+
 ## Cost Controls
 
 - The destination number is locked to `+18054398008`
@@ -164,6 +192,7 @@ python scripts/build_report.py --review
 - The dry-run office agent is intentionally simple and exists to exercise the patient and reporting pipeline, not to replace the real challenge line.
 - The live path is production-oriented but still needs real-call iteration to tune latency, interruption thresholds, and prompt style.
 - The current audio conversion helpers use Python's `audioop`, which is deprecated in Python 3.13 and should be replaced with a dedicated codec path before a long-lived production deployment.
+- Dual-channel capture is requested from Twilio and also reconstructed locally, but real-call verification is still required to confirm the provider-side channels and recordings behave as expected on actual calls.
 
 ## Loom Walkthrough Link Placeholder
 

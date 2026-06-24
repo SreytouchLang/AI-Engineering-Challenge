@@ -13,6 +13,7 @@ from app.agent.dry_run import DryRunConversationRunner
 from app.agent.scenario_loader import load_scenarios
 from app.config import get_settings
 from app.storage.artifacts import ArtifactStore
+from app.storage.recording_builder import build_dry_run_recordings
 
 
 def parse_args() -> argparse.Namespace:
@@ -47,8 +48,19 @@ def main() -> None:
         artifact_store.reserve_call_id(call_id)
         result = DryRunConversationRunner(settings, scenario).run(call_id=call_id)
         transcript_paths = artifact_store.write_transcript(result.transcript)
+        _, mixed_recording_path = build_dry_run_recordings(
+            transcript=result.transcript,
+            artifact_store=artifact_store,
+        )
         metadata = result.metadata.model_copy(
-            update={"transcript_path": f"artifacts/transcripts/{call_id}.txt"}
+            update={
+                "transcript_path": f"artifacts/transcripts/{call_id}.txt",
+                "recording_path": f"artifacts/recordings/{mixed_recording_path.name}",
+                "patient_recording_path": f"artifacts/recordings/{call_id}-patient.wav",
+                "agent_recording_path": f"artifacts/recordings/{call_id}-agent.wav",
+                "mixed_recording_path": f"artifacts/recordings/{mixed_recording_path.name}",
+                "average_transcript_confidence": 1.0,
+            }
         )
         artifact_store.write_metadata(metadata)
         results.append(

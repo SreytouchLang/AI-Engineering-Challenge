@@ -32,6 +32,8 @@ packages = [
   "app",
   "app.agent",
   "app.analysis",
+  "app.experiments",
+  "app.review",
   "app.storage",
   "app.telephony",
   "app.voice",
@@ -40,4 +42,3 @@ packages = [
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]
-

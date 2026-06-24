@@ -183,9 +183,16 @@ class OfficeAgentSimulator:
 
 
 class DryRunConversationRunner:
-    def __init__(self, settings: AppSettings, scenario: Scenario) -> None:
+    def __init__(
+        self,
+        settings: AppSettings,
+        scenario: Scenario,
+        *,
+        response_style: str = "concise",
+    ) -> None:
         self.settings = settings
         self.scenario = scenario
+        self.response_style = response_style
 
     def run(self, call_id: str) -> DryRunResult:
         started_at = datetime.now(UTC)
@@ -195,7 +202,11 @@ class DryRunConversationRunner:
             patient_name=self.scenario.patient.name,
             current_goal=self.scenario.goal.primary,
         )
-        patient = PatientAgent(self.scenario, state)
+        patient = PatientAgent(
+            self.scenario,
+            state,
+            response_style=self.response_style,
+        )
         office = OfficeAgentSimulator(self.scenario)
 
         current_second = 0.0
@@ -209,6 +220,8 @@ class DryRunConversationRunner:
             speaker="PATIENT",
             text=opening,
             latency=LatencySnapshot(model_response_generated_ms=0.0),
+            action=state.action_history[-1] if state.action_history else None,
+            progress=state.last_goal_progress,
         )
 
         while state.turn_count < self.scenario.constraints.max_turns:
@@ -222,20 +235,40 @@ class DryRunConversationRunner:
                 speaker="AGENT",
                 text=agent_text,
                 latency=LatencySnapshot(audio_received_ms=0.0, speech_recognized_ms=0.0),
+                confidence=1.0,
+                channel="agent",
+                speaker_source="simulator",
             )
 
             reply = patient.reply_to_agent(agent_text)
             for key, value in reply.disclosed_facts.items():
                 state.disclose_fact(key, value)
 
+            patient_start = current_second
+            overlap_ms = 0
+            if reply.allow_overlap and segments:
+                last_agent_segment = segments[-1]
+                overlap_ms = min(850, int((last_agent_segment.end_timestamp - last_agent_segment.start_timestamp) * 1000))
+                patient_start = max(
+                    last_agent_segment.start_timestamp + 0.35,
+                    last_agent_segment.end_timestamp - (overlap_ms / 1000),
+                )
+                state.record_barge_in(successful=True, overlap_duration_ms=overlap_ms)
+
             current_second = self._append_exchange(
                 state=state,
                 segments=segments,
-                current_second=current_second,
+                current_second=patient_start,
                 speaker="PATIENT",
                 text=reply.text,
                 interrupted=bool(reply.correction),
                 latency=LatencySnapshot(model_response_generated_ms=0.0),
+                action=reply.action,
+                progress=reply.scenario_goal_progress,
+                channel="patient",
+                speaker_source="simulator",
+                overlap_duration_ms=overlap_ms,
+                confidence=1.0,
             )
             if reply.should_end_call:
                 break
@@ -280,6 +313,12 @@ class DryRunConversationRunner:
         text: str,
         latency: LatencySnapshot,
         interrupted: bool = False,
+        action: str | None = None,
+        progress: float | None = None,
+        channel: str | None = None,
+        speaker_source: str = "simulator",
+        overlap_duration_ms: int = 0,
+        confidence: float | None = None,
     ) -> float:
         duration_ms = duration_ms_from_text(text)
         start = current_second
@@ -290,8 +329,14 @@ class DryRunConversationRunner:
                 text=text,
                 start_timestamp=start,
                 end_timestamp=end,
+                confidence=confidence,
                 interruption_status=interrupted,
                 latency=latency,
+                action=action,
+                goal_progress=progress,
+                channel=channel,  # type: ignore[arg-type]
+                speaker_source=speaker_source,
+                overlap_duration_ms=overlap_duration_ms,
             )
         )
         segments.append(
@@ -300,8 +345,14 @@ class DryRunConversationRunner:
                 start_timestamp=start,
                 end_timestamp=end,
                 text=text,
+                confidence=confidence,
                 interruption_status=interrupted,
                 latency_metadata=latency.model_dump(),
+                action=action,
+                channel=channel,  # type: ignore[arg-type]
+                speaker_source=speaker_source,
+                goal_progress=progress,
+                overlap_duration_ms=overlap_duration_ms,
             )
         )
-        return end
+        return max(end, max((segment.end_timestamp for segment in segments), default=end))

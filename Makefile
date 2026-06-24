@@ -1,6 +1,6 @@
 PYTHON ?= python3
 
-.PHONY: install test serve dry-run call suite analyze report
+.PHONY: install test serve dry-run call suite analyze report replay experiment
 
 install:
 	$(PYTHON) -m pip install -r requirements.txt
@@ -25,3 +25,9 @@ analyze:
 
 report:
 	$(PYTHON) scripts/build_report.py --review
+
+replay:
+	$(PYTHON) scripts/replay_call.py --call-id $(CALL_ID)
+
+experiment:
+	$(PYTHON) scripts/run_experiment.py --config $(CONFIG)

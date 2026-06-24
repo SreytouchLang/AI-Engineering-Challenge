@@ -11,7 +11,8 @@
 
 - Completed a dry-run conversation pipeline that loads a YAML scenario, simulates both sides of the conversation, writes transcripts and metadata, and supports offline evaluation.
 - Ran the 12-scenario dry-run suite successfully and produced fresh transcript and metadata artifacts locally.
-- Added a 24-test regression suite covering guardrails, scenario loading, turn detection, transcript validation, evaluation rules, and telephony error handling.
+- Added a 25-test regression suite covering guardrails, scenario loading, turn detection, transcript validation, evaluation rules, and telephony error handling.
+- Added adaptive patient action planning, transcript validation, dual-channel artifact generation, replay mode, and a FastAPI review surface before any real-call execution.
 
 ## Real issues found during development
 
@@ -22,9 +23,19 @@
 ## Current evidence
 
 - Dry-run artifacts and the evaluation pipeline are implemented.
-- `python3 -m pytest` passes with 24 tests.
+- `python3 -m pytest` passes with 25 tests.
 - `python3 scripts/run_suite.py` completes 12 dry-run scenarios.
+- `python3 scripts/replay_call.py --call-id call-021` replays the interruption scenario and reproduces the same zero-issue evaluation with validation passing.
 - Real telephony credentials, real recordings, and human-verified live-call notes are still pending.
+
+## A/B experiment
+
+- Ran `python3 scripts/run_experiment.py --config experiments/shorter_patient_turns/config.yaml`.
+- Baseline (`prompt_v1_verbose`) average quality score: `97.67`.
+- Candidate (`prompt_v2_concise`) average quality score: `99.0`.
+- Baseline average patient words per turn: `12.4`.
+- Candidate average patient words per turn: `7.42`.
+- Result: the concise adaptive style won in dry-run mode, so the default patient behavior remains short and interruption-friendly going into live-call testing.
 
 ## Remaining limitations
 

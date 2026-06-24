@@ -1,0 +1,76 @@
+{
+  "experiment_id": "shorter_patient_turns",
+  "scenarios": [
+    "simple_scheduling",
+    "interruption_barge_in",
+    "medication_refill"
+  ],
+  "baseline": {
+    "variant_id": "prompt_v1_verbose",
+    "average_quality_score": 97.67,
+    "average_patient_words": 12.4,
+    "validation_pass_rate": 1.0,
+    "issue_count": 0,
+    "calls": [
+      {
+        "call_id": "shorter_patient_turns-prompt_v1_verbose-01",
+        "scenario_id": "simple_scheduling",
+        "quality_score": 97,
+        "validation_passed": true,
+        "issue_count": 0,
+        "average_patient_words": 12.714285714285714
+      },
+      {
+        "call_id": "shorter_patient_turns-prompt_v1_verbose-02",
+        "scenario_id": "interruption_barge_in",
+        "quality_score": 96,
+        "validation_passed": true,
+        "issue_count": 0,
+        "average_patient_words": 12.0
+      },
+      {
+        "call_id": "shorter_patient_turns-prompt_v1_verbose-03",
+        "scenario_id": "medication_refill",
+        "quality_score": 100,
+        "validation_passed": true,
+        "issue_count": 0,
+        "average_patient_words": 12.5
+      }
+    ]
+  },
+  "candidate": {
+    "variant_id": "prompt_v2_concise",
+    "average_quality_score": 99.0,
+    "average_patient_words": 7.42,
+    "validation_pass_rate": 1.0,
+    "issue_count": 0,
+    "calls": [
+      {
+        "call_id": "shorter_patient_turns-prompt_v2_concise-01",
+        "scenario_id": "simple_scheduling",
+        "quality_score": 97,
+        "validation_passed": true,
+        "issue_count": 0,
+        "average_patient_words": 7.571428571428571
+      },
+      {
+        "call_id": "shorter_patient_turns-prompt_v2_concise-02",
+        "scenario_id": "interruption_barge_in",
+        "quality_score": 100,
+        "validation_passed": true,
+        "issue_count": 0,
+        "average_patient_words": 7.2
+      },
+      {
+        "call_id": "shorter_patient_turns-prompt_v2_concise-03",
+        "scenario_id": "medication_refill",
+        "quality_score": 100,
+        "validation_passed": true,
+        "issue_count": 0,
+        "average_patient_words": 7.5
+      }
+    ]
+  },
+  "winner": "prompt_v2_concise",
+  "note": "Dry-run comparison only. Use this as a pre-live tuning signal, not as substitute evidence for the required real calls."
+}

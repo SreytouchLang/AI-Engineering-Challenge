@@ -5,6 +5,8 @@ import subprocess
 from dataclasses import dataclass
 from pathlib import Path
 
+from pydantic import BaseModel
+
 from app.analysis.schemas import CallEvaluation
 from app.analysis.transcript import TranscriptDocument
 from app.storage.metadata import CallMetadata
@@ -13,10 +15,17 @@ from app.storage.metadata import CallMetadata
 @dataclass(frozen=True, slots=True)
 class ArtifactPaths:
     recording: Path
+    patient_recording: Path
+    agent_recording: Path
+    mixed_recording: Path
     transcript_text: Path
     transcript_json: Path
     evaluation_json: Path
     metadata_json: Path
+    quality_json: Path
+    quality_md: Path
+    validation_json: Path
+    validation_md: Path
 
 
 class ArtifactStore:
@@ -26,6 +35,8 @@ class ArtifactStore:
         self.transcripts_dir = root / "transcripts"
         self.evaluations_dir = root / "evaluations"
         self.metadata_dir = root / "call_metadata"
+        self.quality_dir = root / "quality"
+        self.validation_dir = root / "validation"
         self.ensure_layout()
 
     def ensure_layout(self) -> None:
@@ -34,26 +45,42 @@ class ArtifactStore:
             self.transcripts_dir,
             self.evaluations_dir,
             self.metadata_dir,
+            self.quality_dir,
+            self.validation_dir,
         ):
             directory.mkdir(parents=True, exist_ok=True)
 
     def paths_for(self, call_id: str, recording_extension: str = "mp3") -> ArtifactPaths:
         return ArtifactPaths(
             recording=self.recordings_dir / f"{call_id}.{recording_extension}",
+            patient_recording=self.recordings_dir / f"{call_id}-patient.wav",
+            agent_recording=self.recordings_dir / f"{call_id}-agent.wav",
+            mixed_recording=self.recordings_dir / f"{call_id}-mixed.{recording_extension}",
             transcript_text=self.transcripts_dir / f"{call_id}.txt",
             transcript_json=self.transcripts_dir / f"{call_id}.json",
             evaluation_json=self.evaluations_dir / f"{call_id}.json",
             metadata_json=self.metadata_dir / f"{call_id}.json",
+            quality_json=self.quality_dir / f"{call_id}-quality.json",
+            quality_md=self.quality_dir / f"{call_id}-quality.md",
+            validation_json=self.validation_dir / f"{call_id}-validation.json",
+            validation_md=self.validation_dir / f"{call_id}-validation.md",
         )
 
     def reserve_call_id(self, call_id: str) -> None:
         paths = self.paths_for(call_id)
         candidates = (
             paths.recording,
+            paths.patient_recording,
+            paths.agent_recording,
+            paths.mixed_recording,
             paths.transcript_text,
             paths.transcript_json,
             paths.evaluation_json,
             paths.metadata_json,
+            paths.quality_json,
+            paths.quality_md,
+            paths.validation_json,
+            paths.validation_md,
         )
         collisions = [path for path in candidates if path.exists()]
         if collisions:
@@ -77,6 +104,10 @@ class ArtifactStore:
     def write_evaluation(self, evaluation: CallEvaluation) -> Path:
         path = self.paths_for(evaluation.call_id).evaluation_json
         path.write_text(evaluation.model_dump_json(indent=2), encoding="utf-8")
+        return path
+
+    def write_model_json(self, path: Path, payload: BaseModel) -> Path:
+        path.write_text(payload.model_dump_json(indent=2), encoding="utf-8")
         return path
 
     def load_evaluation(self, call_id: str) -> CallEvaluation:
@@ -112,3 +143,6 @@ class ArtifactStore:
         path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
         return path
 
+    def write_markdown(self, path: Path, content: str) -> Path:
+        path.write_text(content, encoding="utf-8")
+        return path

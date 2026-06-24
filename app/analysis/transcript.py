@@ -16,6 +16,11 @@ class TranscriptSegment(BaseModel):
     confidence: float | None = None
     interruption_status: bool = False
     latency_metadata: dict[str, float | None] = Field(default_factory=dict)
+    action: str | None = None
+    channel: Literal["patient", "agent", "system", "mixed"] | None = None
+    speaker_source: str = "simulator"
+    goal_progress: float | None = None
+    overlap_duration_ms: int = 0
 
     @field_validator("end_timestamp")
     @classmethod
@@ -37,11 +42,13 @@ class TranscriptDocument(BaseModel):
 
     @model_validator(mode="after")
     def _validate_ordering(self) -> "TranscriptDocument":
-        previous_end = -1.0
+        previous_start = -1.0
         for segment in self.segments:
-            if segment.start_timestamp < previous_end:
-                raise ValueError("Transcript timestamps must be monotonically ordered.")
-            previous_end = segment.end_timestamp
+            if segment.start_timestamp < previous_start:
+                raise ValueError(
+                    "Transcript segment start timestamps must be monotonically ordered."
+                )
+            previous_start = segment.start_timestamp
         return self
 
     def require_agent_turns(self) -> None:
@@ -57,7 +64,8 @@ class TranscriptDocument(BaseModel):
             "",
         ]
         body = [
-            f"[{format_segment_timestamp(segment.start_timestamp)}] "
+            f"[{format_segment_timestamp(segment.start_timestamp)} - "
+            f"{format_segment_timestamp(segment.end_timestamp)}] "
             f"{segment.speaker}: {segment.text}"
             for segment in self.segments
         ]
@@ -74,4 +82,3 @@ def format_segment_timestamp(timestamp_seconds: float) -> str:
     minutes = int(timestamp_seconds // 60)
     seconds = timestamp_seconds - (minutes * 60)
     return f"{minutes:02d}:{seconds:04.1f}"
-

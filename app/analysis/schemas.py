@@ -32,10 +32,18 @@ class EvaluationIssue(BaseModel):
     category: str
     timestamp: str
     evidence: str
+    evidence_excerpt: str | None = None
     expected_behavior: str
+    actual_behavior: str | None = None
     user_impact: str
+    recording_path: str | None = None
+    transcript_path: str | None = None
+    reproduction_steps: list[str] = Field(default_factory=list)
     confidence: float = Field(ge=0, le=1)
     review_status: str = "pending"
+    review_notes: str | None = None
+    transcript_confidence: float | None = Field(default=None, ge=0, le=1)
+    duplicate_of: str | None = None
 
     @field_validator("timestamp", "evidence", "title", "category")
     @classmethod
@@ -56,6 +64,8 @@ class CallEvaluation(BaseModel):
     expected_outcome: str
     scores: EvaluationScores
     issues: list[EvaluationIssue] = Field(default_factory=list)
+    transcript_validation_passed: bool = True
+    quality_score: int | None = None
 
     @model_validator(mode="after")
     def _require_evidence(self) -> "CallEvaluation":
@@ -63,4 +73,3 @@ class CallEvaluation(BaseModel):
             if not issue.evidence or not issue.timestamp:
                 raise ValueError("Each evaluation issue must include evidence and a timestamp.")
         return self
-
