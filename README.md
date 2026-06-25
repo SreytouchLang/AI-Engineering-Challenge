@@ -312,4 +312,3 @@ Every box below reflects the free, fully runnable simulator and is verified true
 ### Not done (would require a paid live submission)
 
 - [ ] Real phone calls to the PGAI assessment line (needs Twilio + OpenAI credentials)
-- [ ] Loom walkthrough video recorded (a script is provided in [LOOM_SCRIPT.md](LOOM_SCRIPT.md))
