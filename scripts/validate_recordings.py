@@ -9,12 +9,15 @@ if str(PROJECT_ROOT) not in sys.path:
 
 from app.analysis.recording_validation import RecordingValidator
 from app.config import get_settings
+from app.doc_paths import get_repo_doc_paths
 from app.storage.artifacts import ArtifactStore
 from app.submission import is_provider_confirmed_live_call, list_call_bundles
 
 
 def main() -> None:
     settings = get_settings()
+    docs = get_repo_doc_paths(settings.project_root)
+    docs.ensure_layout()
     artifact_store = ArtifactStore(settings.artifacts_root)
     bundles = [bundle for bundle in list_call_bundles(artifact_store) if is_provider_confirmed_live_call(bundle.metadata)]
     validator = RecordingValidator(duration_tolerance_seconds=settings.duration_mismatch_tolerance_seconds)
@@ -38,7 +41,7 @@ def main() -> None:
         )
         artifact_store.write_metadata(updated)
 
-    output_path = settings.project_root / "RECORDING_VALIDATION_REPORT.md"
+    output_path = docs.recording_validation_report
     lines = ["# Recording Validation Report", ""]
     if not bundles:
         lines.extend(

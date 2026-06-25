@@ -9,12 +9,15 @@ if str(PROJECT_ROOT) not in sys.path:
 
 from app.analysis.validation import TranscriptValidator
 from app.config import get_settings
+from app.doc_paths import get_repo_doc_paths
 from app.storage.artifacts import ArtifactStore
 from app.submission import is_provider_confirmed_live_call, list_call_bundles
 
 
 def main() -> None:
     settings = get_settings()
+    docs = get_repo_doc_paths(settings.project_root)
+    docs.ensure_layout()
     artifact_store = ArtifactStore(settings.artifacts_root)
     validator = TranscriptValidator(
         gap_threshold_ms=settings.transcript_gap_threshold_ms,
@@ -45,7 +48,7 @@ def main() -> None:
         )
         artifact_store.write_metadata(updated)
 
-    output_path = settings.project_root / "TRANSCRIPT_VALIDATION_REPORT.md"
+    output_path = docs.transcript_validation_report
     lines = ["# Transcript Validation Report", ""]
     if not bundles:
         lines.extend(

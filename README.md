@@ -2,7 +2,7 @@
 
 Repository: https://github.com/SreytouchLang/AI-Engineering-Challenge
 
-This repository implements a Python voice-bot assessment harness for Pretty Good AI's authorized challenge number, `+1-805-439-8008`. The current build is intentionally split into two layers:
+This repository implements a Python voice-bot assessment harness for Pretty Good AI's authorized challenge number, `+1-805-439-8008`. Supporting writeups and generated Markdown reports now live under `docs/` so the repo root stays focused on code and the main entrypoint.
 
 1. A fully runnable local dry-run path that validates scenarios, simulates natural patient conversations, writes transcripts and metadata, and generates structured evaluations and bug reports.
 2. A guarded live-call path that uses Twilio bidirectional media streams plus OpenAI-based STT, text generation, and TTS. Live calling is disabled by default and requires both `ENABLE_REAL_CALLS=true` and an explicit confirmation flag.
@@ -40,7 +40,7 @@ Each run writes, per call:
 - a real mixed MP3 conversation in `artifacts/recordings/<call-id>-mixed.mp3` (plus per-speaker WAVs)
 - a two-speaker transcript re-timed to the audio in `artifacts/transcripts/<call-id>.txt`
 - a structured evaluation in `artifacts/evaluations/<call-id>.json`
-- an aggregate, severity-sorted [VOICE_SIM_BUG_REPORT.md](VOICE_SIM_BUG_REPORT.md)
+- an aggregate, severity-sorted [docs/reports/VOICE_SIM_BUG_REPORT.md](docs/reports/VOICE_SIM_BUG_REPORT.md)
 
 This path uses two distinct voices (patient vs. agent) and natural sequential turn-taking, so the recordings sound like a genuine phone conversation. It is fully self-contained and does not place or simulate any real telephone call.
 
@@ -236,8 +236,8 @@ python scripts/validate_transcripts.py
 
 Review the current code-level live-call audit before the first smoke call:
 
-- [LIVE_CALL_READINESS.md](LIVE_CALL_READINESS.md)
-- [FIRST_REAL_CALL_PLAN.md](FIRST_REAL_CALL_PLAN.md)
+- `docs/submission/` contains the current live-call planning and audit docs
+- [docs/submission/FIRST_REAL_CALL_PLAN.md](docs/submission/FIRST_REAL_CALL_PLAN.md)
 
 Rank currently selected calls:
 

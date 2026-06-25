@@ -8,6 +8,7 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 from app.config import get_settings
+from app.doc_paths import get_repo_doc_paths
 from app.storage.artifacts import ArtifactStore
 from app.submission import (
     approved_live_issues,
@@ -44,6 +45,8 @@ def _rank_score(bundle) -> float:
 
 def main() -> None:
     settings = get_settings()
+    docs = get_repo_doc_paths(settings.project_root)
+    docs.ensure_layout()
     artifact_store = ArtifactStore(settings.artifacts_root)
     bundles = [bundle for bundle in list_call_bundles(artifact_store) if is_provider_confirmed_live_call(bundle.metadata)]
     ranked = sorted(bundles, key=_rank_score, reverse=True)
@@ -81,7 +84,7 @@ def main() -> None:
             ]
         )
 
-    output_path = settings.project_root / "FINAL_CALL_SELECTION.md"
+    output_path = docs.final_call_selection
     output_path.write_text("\n".join(lines).rstrip() + "\n", encoding="utf-8")
     print(f"Wrote {output_path.name} with {len(ranked)} provider-confirmed calls ranked and {len(approved)} calls approved for submission.")
 

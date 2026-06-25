@@ -8,6 +8,7 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 from app.config import get_settings
+from app.doc_paths import get_repo_doc_paths
 from app.storage.artifacts import ArtifactStore
 from app.submission import (
     approved_live_issues,
@@ -89,6 +90,8 @@ def _manual_review_section(bundle) -> str:
 
 def main() -> None:
     settings = get_settings()
+    docs = get_repo_doc_paths(settings.project_root)
+    docs.ensure_layout()
     artifact_store = ArtifactStore(settings.artifacts_root)
     bundles = list_call_bundles(artifact_store)
     live_bundles = [bundle for bundle in bundles if is_provider_confirmed_live_call(bundle.metadata)]
@@ -115,7 +118,7 @@ def main() -> None:
         )
     if not live_bundles:
         tracker_lines.append("| None | - | No | No | No | No | No | No |")
-    progress_path = settings.project_root / "LIVE_CALL_PROGRESS.md"
+    progress_path = docs.live_call_progress
     progress_path.write_text("\n".join(tracker_lines).rstrip() + "\n", encoding="utf-8")
 
     manual_lines = ["# Manual Call Review", ""]
@@ -128,7 +131,7 @@ def main() -> None:
         )
     for bundle in live_bundles:
         manual_lines.append(_manual_review_section(bundle))
-    manual_path = settings.project_root / "MANUAL_CALL_REVIEW.md"
+    manual_path = docs.manual_call_review
     manual_path.write_text("\n".join(manual_lines).rstrip() + "\n", encoding="utf-8")
 
     total_real_calls = len(live_bundles)

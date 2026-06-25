@@ -11,6 +11,7 @@ from app.analysis.quality import VoiceQualityReport
 from app.analysis.schemas import CallEvaluation, EvaluationIssue
 from app.analysis.transcript import TranscriptDocument
 from app.analysis.validation import TranscriptValidationReport
+from app.doc_paths import get_repo_doc_paths
 from app.safety import AUTHORIZED_DESTINATION
 from app.storage.artifacts import ArtifactPaths, ArtifactStore
 from app.storage.metadata import CallMetadata
@@ -156,7 +157,7 @@ def public_repository_accessible(url: str) -> tuple[bool, str]:
 
 
 def public_repository_audit_verified(project_root: Path, url: str) -> bool:
-    audit_path = project_root / "PUBLIC_REPOSITORY_AUDIT.md"
+    audit_path = get_repo_doc_paths(project_root).public_repository_audit
     if not audit_path.exists():
         return False
     content = audit_path.read_text(encoding="utf-8")

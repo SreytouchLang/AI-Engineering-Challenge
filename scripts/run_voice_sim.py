@@ -27,6 +27,7 @@ from app.agent.scenario_loader import Scenario, load_scenario, load_scenarios
 from app.analysis.evaluator import ConversationEvaluator
 from app.analysis.schemas import CallEvaluation, EvaluationIssue, Severity
 from app.config import AppSettings, get_settings
+from app.doc_paths import get_repo_doc_paths
 from app.storage.artifacts import ArtifactStore
 from app.storage.recording_builder import build_spoken_recordings
 from app.voice.local_tts import (
@@ -36,7 +37,6 @@ from app.voice.local_tts import (
 )
 
 _SEVERITY_ORDER = [Severity.CRITICAL, Severity.HIGH, Severity.MEDIUM, Severity.LOW]
-_REPORT_PATH = PROJECT_ROOT / "VOICE_SIM_BUG_REPORT.md"
 
 
 def parse_args() -> argparse.Namespace:
@@ -126,6 +126,8 @@ def run_one(
 
 
 def write_bug_report(evaluations: list[CallEvaluation]) -> int:
+    report_path = get_repo_doc_paths(PROJECT_ROOT).voice_sim_bug_report
+    report_path.parent.mkdir(parents=True, exist_ok=True)
     rows: list[tuple[Severity, str, EvaluationIssue]] = []
     for evaluation in evaluations:
         for issue in evaluation.issues:
@@ -158,7 +160,7 @@ def write_bug_report(evaluations: list[CallEvaluation]) -> int:
             f"- **Why it matters:** {issue.user_impact}",
             "",
         ]
-    _REPORT_PATH.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    report_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
     return len(rows)
 
 
@@ -168,6 +170,8 @@ def main() -> None:
         raise SystemExit("Voice simulator needs `say` (macOS) and `ffmpeg` on PATH. Install ffmpeg with `brew install ffmpeg`.")
 
     settings = get_settings()
+    docs = get_repo_doc_paths(PROJECT_ROOT)
+    docs.ensure_layout()
     artifact_store = ArtifactStore(settings.artifacts_root)
 
     if args.all:
@@ -216,7 +220,7 @@ def main() -> None:
                 "mode": "voice_sim",
                 "calls": len(results),
                 "total_findings": total_findings,
-                "bug_report": str(_REPORT_PATH.relative_to(PROJECT_ROOT)),
+                "bug_report": str(docs.voice_sim_bug_report.relative_to(PROJECT_ROOT)),
                 "results": results,
             },
             indent=2,

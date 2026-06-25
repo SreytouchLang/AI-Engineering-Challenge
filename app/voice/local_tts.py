@@ -45,28 +45,33 @@ def _run(command: list[str]) -> subprocess.CompletedProcess[str]:
 def synthesize_line(text: str, *, voice: str | None = None, rate_wpm: int | None = None) -> SynthesizedLine:
     """Synthesize one line of dialogue into 8 kHz mono PCM16 bytes.
 
-    Falls back to the system default voice if the requested one is missing, so a
+    Falls back to a known-good built-in voice if the requested one is missing, so a
     machine without a specific voice installed still produces audio.
     """
     if not tts_available():
         raise RuntimeError("Local TTS requires both `say` and `ffmpeg` on PATH.")
 
     spoken = text.strip() or "..."
+    chosen_voice = voice or DEFAULT_PATIENT_VOICE
     with tempfile.TemporaryDirectory(prefix="voice-sim-") as tmp:
         aiff_path = Path(tmp) / "line.aiff"
         wav_path = Path(tmp) / "line.wav"
 
         say_command = ["say"]
-        if voice:
-            say_command += ["-v", voice]
+        if chosen_voice:
+            say_command += ["-v", chosen_voice]
         if rate_wpm:
             say_command += ["-r", str(rate_wpm)]
         say_command += ["-o", str(aiff_path), spoken]
 
         result = _run(say_command)
-        if result.returncode != 0 and voice:
+        if result.returncode != 0 and chosen_voice != DEFAULT_PATIENT_VOICE:
             # Requested voice is probably not installed; retry with the default.
-            result = _run(["say", "-o", str(aiff_path), spoken])
+            retry_command = ["say", "-v", DEFAULT_PATIENT_VOICE]
+            if rate_wpm:
+                retry_command += ["-r", str(rate_wpm)]
+            retry_command += ["-o", str(aiff_path), spoken]
+            result = _run(retry_command)
         if result.returncode != 0:
             raise RuntimeError(f"`say` failed: {result.stderr.strip()}")
 

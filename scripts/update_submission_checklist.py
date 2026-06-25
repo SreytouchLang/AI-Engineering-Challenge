@@ -9,6 +9,7 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 from app.config import get_settings
+from app.doc_paths import get_repo_doc_paths
 from app.storage.artifacts import ArtifactStore
 from app.submission import (
     approved_live_issues,
@@ -38,6 +39,8 @@ def _loom_fields_populated(readme_text: str) -> bool:
 
 def main() -> None:
     settings = get_settings()
+    docs = get_repo_doc_paths(settings.project_root)
+    docs.ensure_layout()
     artifact_store = ArtifactStore(settings.artifacts_root)
     bundles = list_call_bundles(artifact_store)
 
@@ -50,7 +53,7 @@ def main() -> None:
     transcripts_ok = bool(selected_calls) and all(transcript_is_valid(bundle) for bundle in selected_calls)
     approved_bugs_ok = any(approved_live_issues(bundle) for bundle in selected_calls)
     manual_review_ok = bool(selected_calls) and all(manual_review_completed(bundle) for bundle in selected_calls)
-    submission_form_ok = submission_form_ready(settings.project_root / "SUBMISSION_FORM_READY.md")
+    submission_form_ok = submission_form_ready(docs.submission_form_ready)
 
     readme_path = settings.project_root / "README.md"
     content = readme_path.read_text(encoding="utf-8")

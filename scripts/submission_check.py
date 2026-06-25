@@ -9,6 +9,7 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 from app.config import get_settings
+from app.doc_paths import get_repo_doc_paths
 from app.safety import scan_paths_for_secrets
 from app.storage.artifacts import ArtifactStore
 from app.submission import (
@@ -42,6 +43,8 @@ def _module_available(module_name: str) -> bool:
 
 def main() -> None:
     settings = get_settings()
+    docs = get_repo_doc_paths(settings.project_root)
+    docs.ensure_layout()
     artifact_store = ArtifactStore(settings.artifacts_root)
     bundles = list_call_bundles(artifact_store)
     selected_calls = [bundle for bundle in bundles if selected_for_submission(bundle)]
@@ -61,7 +64,7 @@ def main() -> None:
     readme_text = readme_path.read_text(encoding="utf-8")
     main_loom_ok = "Main walkthrough: `TBD`" not in readme_text
     ai_loom_ok = "AI debugging walkthrough: `TBD`" not in readme_text
-    submission_form_ok = submission_form_ready(settings.project_root / "SUBMISSION_FORM_READY.md")
+    submission_form_ok = submission_form_ready(docs.submission_form_ready)
 
     tests_ok = _run([sys.executable, "-m", "pytest", "-q"])
     format_ok = _run([sys.executable, "-m", "ruff", "format", "--check", "."]) if _module_available("ruff") else False
@@ -76,8 +79,8 @@ def main() -> None:
         settings.project_root,
         [
             settings.project_root / "README.md",
-            settings.project_root / "BUG_REPORT.md",
-            settings.project_root / "FINAL_CALL_SELECTION.md",
+            docs.bug_report,
+            docs.final_call_selection,
         ],
     )
     links_ok = not link_failures
