@@ -78,6 +78,13 @@ class AppSettings(BaseSettings):
     duration_mismatch_tolerance_seconds: float = Field(default=1.5, ge=0)
     expected_cost_per_call_usd: float = Field(default=1.25, ge=0)
 
+    @field_validator("public_base_url", mode="before")
+    @classmethod
+    def _blank_url_to_none(cls, value: object) -> object:
+        if isinstance(value, str) and not value.strip():
+            return None
+        return value
+
     @field_validator("authorized_destination")
     @classmethod
     def _validate_authorized_destination(cls, value: str) -> str:

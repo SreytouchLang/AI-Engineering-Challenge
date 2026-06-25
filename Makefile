@@ -1,6 +1,6 @@
 PYTHON ?= python3
 
-.PHONY: install format format-check lint typecheck test serve dry-run call fetch-recording transcribe-call suite analyze report replay experiment preflight validate-scenarios validate-recordings validate-transcripts live-progress rank-calls submission-check
+.PHONY: install format format-check lint typecheck test serve dry-run call fetch-recording transcribe-call suite voice-sim voice-suite analyze report replay experiment preflight validate-scenarios validate-recordings validate-transcripts live-progress rank-calls submission-check
 
 install:
 	$(PYTHON) -m pip install -r requirements.txt
@@ -37,6 +37,12 @@ transcribe-call:
 
 suite:
 	$(PYTHON) scripts/run_suite.py
+
+voice-sim:
+	$(PYTHON) scripts/run_voice_sim.py --scenario $(SCENARIO)
+
+voice-suite:
+	$(PYTHON) scripts/run_voice_sim.py --all
 
 analyze:
 	$(PYTHON) scripts/analyze_call.py --call-id $(CALL_ID)

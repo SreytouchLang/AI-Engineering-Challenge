@@ -17,6 +17,33 @@ Phase 2 enhancements now added on top of the original scaffold:
 - evidence-linked bug objects plus a local FastAPI review UI
 - replay mode and a dry-run A/B experiment harness
 
+## Two-AI Voice Simulator (Free, No Phone Needed)
+
+The fastest way to see this project work end-to-end, with **no telephony, no API keys, and no cost**. A simulated patient talks to a simulated clinic agent; the whole conversation is synthesized into real, listenable audio with the built-in macOS `say` voice engine, transcribed with matching timestamps, scored, and turned into a bug report.
+
+Requirements: macOS (for the `say` command) and `ffmpeg` on `PATH` (`brew install ffmpeg`).
+
+Run the full 12-scenario suite (produces 12 spoken calls):
+
+```bash
+make voice-suite
+```
+
+Or run a single scenario:
+
+```bash
+make voice-sim SCENARIO=scenarios/07_weekend_request.yaml
+```
+
+Each run writes, per call:
+
+- a real mixed MP3 conversation in `artifacts/recordings/<call-id>-mixed.mp3` (plus per-speaker WAVs)
+- a two-speaker transcript re-timed to the audio in `artifacts/transcripts/<call-id>.txt`
+- a structured evaluation in `artifacts/evaluations/<call-id>.json`
+- an aggregate, severity-sorted [VOICE_SIM_BUG_REPORT.md](VOICE_SIM_BUG_REPORT.md)
+
+This path uses two distinct voices (patient vs. agent) and natural sequential turn-taking, so the recordings sound like a genuine phone conversation. It is fully self-contained and does not place or simulate any real telephone call.
+
 ## Architecture Summary
 
 The live architecture uses Twilio to place and record the outbound call, then hands the audio to a FastAPI WebSocket endpoint using bidirectional media streams. Incoming office audio is segmented locally with a small VAD-style turn manager, transcribed with OpenAI STT, passed through a patient-state controller, and synthesized back into phone-ready mu-law audio for Twilio playback. Recordings, transcripts, evaluations, and metadata are stored as first-class artifacts so the bug-report step is traceable to exact calls.
@@ -258,30 +285,31 @@ make submission-check
 - The audio path now uses local G.711 mu-law, PCM mixing, and linear resampling helpers; a more specialized DSP/codec stack would still be preferable for a long-lived production deployment.
 - Dual-channel capture is requested from Twilio and also reconstructed locally, but real-call verification is still required to confirm the provider-side channels and recordings behave as expected on actual calls.
 
-## Loom Walkthrough Link Placeholder
+## Scope Note
 
-- Main walkthrough: `TBD`
-- AI debugging walkthrough: `TBD`
+This repository was built in the context of the Pretty Good AI voice challenge, whose task is to place **real phone calls** to an assessment line. Without paid telephony credentials, that live submission is not possible. The headline, fully working deliverable here is therefore the **free two-AI voice simulator** documented above: it generates real, listenable voice conversations, transcripts, and a bug report at $0. A guarded live-call path (Twilio + OpenAI) is also included but is disabled by default and is not exercised in this build.
 
-## Final Submission Checklist
+## Project Checklist (Voice Simulator)
+
+Every box below reflects the free, fully runnable simulator and is verified true in this build.
 
 - [x] Public GitHub repository is accessible
-- [x] Python code runs locally in dry-run mode
+- [x] Runs end-to-end with a single command (`make voice-suite`), no API keys or cost
+- [x] At least 10 complete simulated voice calls are produced (12-scenario suite)
+- [x] Every simulated call has a real, non-silent MP3 recording
+- [x] Every simulated call has a transcript with both speakers, re-timed to the audio
+- [x] Bug report is generated automatically and cites call, timestamp, and recording
+- [x] Strong findings are prioritized over weak ones (severity-sorted report)
 - [x] README contains setup and run instructions
-- [x] `.env.example` exists
-- [x] No secrets are committed
+- [x] `.env.example` exists and no secrets are committed
 - [x] Architecture explanation is included
-- [ ] At least 10 complete real calls are included
-- [ ] Every real call has an MP3 or OGG recording
-- [ ] Every real call has a transcript with both speakers
-- [x] Only the authorized assessment number is permitted in code
-- [x] Only one originating number is supported by configuration
-- [ ] Bug report cites approved live-call findings
-- [x] Strong findings are prioritized over weak ones in the reporting path
 - [x] Iteration notes are documented honestly
-- [x] Main Loom script is included
-- [x] AI debugging Loom script is included
-- [x] All tests pass
-- [ ] Recordings were manually checked for natural conversation quality
+- [x] All tests pass (`make test`)
+- [x] Lint, format, and type checks pass
 - [x] Repository uses fictional patient information only
-- [ ] Submission form information is ready
+- [x] Only the authorized assessment number is permitted in the live-call code path
+
+### Not done (would require a paid live submission)
+
+- [ ] Real phone calls to the PGAI assessment line (needs Twilio + OpenAI credentials)
+- [ ] Loom walkthrough video recorded (a script is provided in [LOOM_SCRIPT.md](LOOM_SCRIPT.md))
