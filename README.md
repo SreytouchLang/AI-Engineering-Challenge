@@ -256,7 +256,6 @@ make submission-check
 ## Loom Videos
 
 - Main walkthrough: [https://www.loom.com/share/804e60809c2843a69ae02ba92d6c0a7f](https://www.loom.com/share/804e60809c2843a69ae02ba92d6c0a7f)
-- AI debugging walkthrough: pending
 
 ## Cost Controls
 
