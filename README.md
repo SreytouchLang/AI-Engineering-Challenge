@@ -253,6 +253,11 @@ make submission-check
 
 `make submission-check` is intentionally strict and exits nonzero until public Loom links, approved live-call evidence, and submission-ready call selections exist.
 
+## Loom Videos
+
+- Main walkthrough: [https://www.loom.com/share/804e60809c2843a69ae02ba92d6c0a7f](https://www.loom.com/share/804e60809c2843a69ae02ba92d6c0a7f)
+- AI debugging walkthrough: pending
+
 ## Cost Controls
 
 - The destination number is locked to `+1-805-439-8008`

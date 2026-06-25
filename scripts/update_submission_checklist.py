@@ -15,12 +15,14 @@ from app.submission import (
     approved_live_issues,
     has_required_recording,
     list_call_bundles,
+    loom_url_ready,
     manual_review_completed,
     public_repository_accessible,
     public_repository_audit_verified,
     real_call_is_complete,
     selected_for_submission,
     submission_form_ready,
+    submission_form_values,
     transcript_is_valid,
 )
 
@@ -33,8 +35,8 @@ def _replace_checkbox(content: str, label: str, checked: bool) -> str:
     return pattern.sub(f"- [{state}] {label}", content)
 
 
-def _loom_fields_populated(readme_text: str) -> bool:
-    return "Main walkthrough: `TBD`" not in readme_text and "AI debugging walkthrough: `TBD`" not in readme_text
+def _loom_fields_populated(main_loom_url: str, ai_loom_url: str) -> bool:
+    return loom_url_ready(main_loom_url) and loom_url_ready(ai_loom_url)
 
 
 def main() -> None:
@@ -54,6 +56,7 @@ def main() -> None:
     approved_bugs_ok = any(approved_live_issues(bundle) for bundle in selected_calls)
     manual_review_ok = bool(selected_calls) and all(manual_review_completed(bundle) for bundle in selected_calls)
     submission_form_ok = submission_form_ready(docs.submission_form_ready)
+    submission_values = submission_form_values(docs.submission_form_ready)
 
     readme_path = settings.project_root / "README.md"
     content = readme_path.read_text(encoding="utf-8")
@@ -70,7 +73,15 @@ def main() -> None:
     content = _replace_checkbox(content, "Every real call has a transcript with both speakers", transcripts_ok)
     content = _replace_checkbox(content, "Bug report cites approved live-call findings", approved_bugs_ok)
     content = _replace_checkbox(content, "Recordings were manually checked for natural conversation quality", manual_review_ok)
-    content = _replace_checkbox(content, "Submission form information is ready", submission_form_ok and _loom_fields_populated(content))
+    content = _replace_checkbox(
+        content,
+        "Submission form information is ready",
+        submission_form_ok
+        and _loom_fields_populated(
+            submission_values.get("Main Loom URL", ""),
+            submission_values.get("AI debugging Loom URL", ""),
+        ),
+    )
     readme_path.write_text(content, encoding="utf-8")
 
 

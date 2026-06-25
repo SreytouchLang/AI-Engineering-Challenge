@@ -16,12 +16,14 @@ from app.submission import (
     approved_live_issues,
     artifact_link_targets_exist,
     list_call_bundles,
+    loom_url_ready,
     manual_review_completed,
     public_repository_accessible,
     public_repository_audit_verified,
     real_call_is_complete,
     selected_for_submission,
     submission_form_ready,
+    submission_form_values,
 )
 
 REPO_URL = "https://github.com/SreytouchLang/AI-Engineering-Challenge"
@@ -60,10 +62,9 @@ def main() -> None:
     approved_bugs_ok = any(approved_live_issues(bundle) for bundle in selected_calls)
     manual_review_ok = bool(selected_calls) and all(manual_review_completed(bundle) for bundle in selected_calls)
 
-    readme_path = settings.project_root / "README.md"
-    readme_text = readme_path.read_text(encoding="utf-8")
-    main_loom_ok = "Main walkthrough: `TBD`" not in readme_text
-    ai_loom_ok = "AI debugging walkthrough: `TBD`" not in readme_text
+    submission_values = submission_form_values(docs.submission_form_ready)
+    main_loom_ok = loom_url_ready(submission_values.get("Main Loom URL", ""))
+    ai_loom_ok = loom_url_ready(submission_values.get("AI debugging Loom URL", ""))
     submission_form_ok = submission_form_ready(docs.submission_form_ready)
 
     tests_ok = _run([sys.executable, "-m", "pytest", "-q"])

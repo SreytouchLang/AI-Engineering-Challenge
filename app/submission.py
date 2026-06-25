@@ -183,6 +183,20 @@ def artifact_link_targets_exist(root: Path, markdown_paths: Iterable[Path]) -> l
     return missing
 
 
+def submission_form_values(path: Path) -> dict[str, str]:
+    if not path.exists():
+        return {}
+    return {
+        line.split(":", maxsplit=1)[0].strip(): line.split(":", maxsplit=1)[1].strip()
+        for line in path.read_text(encoding="utf-8").splitlines()
+        if ":" in line
+    }
+
+
+def loom_url_ready(url: str) -> bool:
+    return bool(url) and url.startswith("https://www.loom.com/share/")
+
+
 def submission_form_ready(path: Path) -> bool:
     if not path.exists():
         return False
@@ -202,9 +216,7 @@ def submission_form_ready(path: Path) -> bool:
     blocked_tokens = ("TBD", "Pending", "Unknown", "TODO")
     if any(token in content for token in blocked_tokens):
         return False
-    values = {
-        line.split(":", maxsplit=1)[0].strip(): line.split(":", maxsplit=1)[1].strip() for line in content.splitlines() if ":" in line
-    }
+    values = submission_form_values(path)
     required_values = [
         values.get("GitHub repository", ""),
         values.get("Main Loom URL", ""),

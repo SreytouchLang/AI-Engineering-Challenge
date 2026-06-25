@@ -14,6 +14,7 @@ from app.config import AppSettings
 from app.safety import AUTHORIZED_DESTINATION, scan_paths_for_secrets
 from app.storage.artifacts import ArtifactStore
 from app.storage.metadata import CallMetadata
+from app.submission import loom_url_ready, submission_form_values
 from app.telephony.preflight import build_live_call_preflight
 from app.voice.audio import pcm16_to_wav_bytes
 
@@ -250,3 +251,28 @@ def test_bug_review_queue_includes_expected_review_fields(tmp_path: Path) -> Non
     assert "**Expected behavior:**" in queue
     assert "**Reproduction steps:**" in queue
     assert "**Confidence:** 0.91" in queue
+
+
+def test_submission_form_values_track_main_and_ai_loom_separately(tmp_path: Path) -> None:
+    form = tmp_path / "SUBMISSION_FORM_READY.md"
+    form.write_text(
+        "\n".join(
+            [
+                "GitHub repository: https://github.com/SreytouchLang/AI-Engineering-Challenge",
+                "Main Loom URL: https://www.loom.com/share/main-video",
+                "AI debugging Loom URL:",
+                "Single originating phone number in E.164 format:",
+                "Number of selected real calls:",
+                "Strongest call:",
+                "Strongest finding:",
+                "Final validation date:",
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    values = submission_form_values(form)
+
+    assert loom_url_ready(values["Main Loom URL"]) is True
+    assert loom_url_ready(values["AI debugging Loom URL"]) is False

@@ -8,4 +8,4 @@ Audit date: 2026-06-23 (America/Los_Angeles)
 - Current README is present at repository root.
 - Current source tree includes `app/`, `scripts/`, `tests/`, `scenarios/`, `README.md`, and submission-support documents.
 - `.env` is not tracked; `.env.example` contains placeholders only.
-- Public root access is verified, but real-call artifacts, Loom URLs, and final submission evidence are still incomplete.
+- Public root access is verified. The main Loom URL is now present, but the AI debugging Loom, real-call artifacts, and final submission evidence are still incomplete.
